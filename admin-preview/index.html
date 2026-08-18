@@ -1,0 +1,127 @@
+<!doctype html>
+<html>
+<head>
+  <meta charset="utf-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <meta name="robots" content="noindex, nofollow" />
+  <title>CMS Demo — Tumenko Portfolio</title>
+  <link href="/assets/images/image-882b5959.png" rel="icon" media="(prefers-color-scheme: light)">
+  <link href="/assets/images/image-863a9fee.png" rel="icon" media="(prefers-color-scheme: dark)">
+  <style>
+    #demo-banner {
+      position: fixed; top: 0; left: 0; right: 0; z-index: 100000;
+      background: #111; color: #fff; font: 13px/1.4 -apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif;
+      padding: 8px 16px; text-align: center; letter-spacing: .01em;
+    }
+    #demo-banner b { color: #ffd166; }
+    body { padding-top: 34px; }
+  </style>
+</head>
+<body>
+  <div id="demo-banner">
+    <b>DEMO PANEL</b> — bez logina, samo za pregled. Izmene se <b>ne čuvaju</b> i ne idu na sajt.
+    Pravi panel je na <a href="/admin" style="color:#8ab4ff">/admin</a>.
+  </div>
+
+  <script>
+    // Decap "test-repo" backend: sve živi u memoriji browsera — nema GitHub-a,
+    // nema logina, nema commit-a. Save/Publish rade vizuelno, ali se ništa ne
+    // upisuje; refresh vraća na ove seed fajlove ispod.
+    window.CMS_MANUAL_INIT = true;
+    window.repoFiles = {
+      content: {
+        work: {
+          "kalyra-atelier.md": {
+            content: [
+              "---",
+              "title: Kalyra Atelier",
+              "slug: kalyra-atelier",
+              "status: Live",
+              "year: 2025",
+              "services:",
+              "  - Brand Identity",
+              "  - Art Direction",
+              "overview: Visual identity for a Ljubljana-based ceramics studio.",
+              "live_link: ''",
+              "hero_image: /assets/images/opt/image-ed8daf0f-1024.webp",
+              "gallery:",
+              "  - type: image",
+              "    src: /assets/images/opt/image-c59409fa-1024.webp",
+              "    alt: Packaging system",
+              "  - type: image",
+              "    src: /assets/images/opt/image-3faea17f-1024.webp",
+              "    alt: Studio photography",
+              "---",
+              "",
+              "Primer projekta — ovako izgleda popunjena forma i case study stranica.",
+            ].join("\n"),
+          },
+          "novi-projekat.md": {
+            content: [
+              "---",
+              "title: Novi projekat (Draft)",
+              "slug: novi-projekat",
+              "status: Draft",
+              "year: 2026",
+              "services:",
+              "  - Brand Identity",
+              "overview: Draft se ne prikazuje na sajtu dok se ne prebaci na Live.",
+              "live_link: ''",
+              "hero_image: /assets/images/opt/image-c8765043-1024.webp",
+              "gallery: []",
+              "---",
+              "",
+            ].join("\n"),
+          },
+        },
+      },
+    };
+  </script>
+
+  <script src="https://unpkg.com/decap-cms@^3.0.0/dist/decap-cms.js"></script>
+
+  <script>
+    CMS.init({
+      config: {
+        load_config_file: false,
+        backend: { name: "test-repo" },
+        media_folder: "assets/uploads",
+        public_folder: "/assets/uploads",
+        collections: [
+          {
+            name: "work",
+            label: "Work",
+            label_singular: "Project",
+            folder: "content/work",
+            create: true,
+            slug: "{{slug}}",
+            identifier_field: "title",
+            fields: [
+              { label: "Title", name: "title", widget: "string" },
+              { label: "Slug (URL)", name: "slug", widget: "string", hint: "Ide u URL, npr. my-project -> /work/my-project" },
+              { label: "Status", name: "status", widget: "select", options: ["Live", "Draft"], default: "Live", hint: "Draft se ne builduje i ne prikazuje." },
+              { label: "Year", name: "year", widget: "number", value_type: "int" },
+              { label: "Services / Discipline", name: "services", widget: "list", default: ["Brand Identity"] },
+              { label: "Overview", name: "overview", widget: "text", hint: "Kratak opis na kartici u Work listi." },
+              { label: "Live Link", name: "live_link", widget: "string", required: false },
+              { label: "Hero Image", name: "hero_image", widget: "image" },
+              {
+                label: "Gallery",
+                name: "gallery",
+                widget: "list",
+                summary: "{{fields.type}} — {{fields.alt}}",
+                fields: [
+                  { label: "Type", name: "type", widget: "select", options: ["image", "video"], default: "image" },
+                  { label: "File", name: "src", widget: "file", hint: "Slika (jpg/png) ili video (mp4)." },
+                  { label: "Alt text", name: "alt", widget: "string", required: false },
+                ],
+              },
+              { label: "Project Overview", name: "body", widget: "markdown", hint: "Duži case-study tekst na dnu stranice." },
+            ],
+          },
+        ],
+      },
+    });
+  </script>
+</body>
+</html>
