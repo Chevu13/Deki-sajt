@@ -1,0 +1,53 @@
+<!--CMS_HEAD-->
+<link rel="stylesheet" href="/assets/cms.css">
+</head>
+<body>
+<div id="cms-menu-overlay" class="cms-menu-overlay" data-cms-menu-overlay>
+  <button class="cms-menu-overlay__close" type="button" data-cms-menu-close>Close</button>
+  <nav class="cms-menu-overlay__links">
+    <a href="../../">Home</a>
+    <a href="../">Works</a>
+    <a href="../../about">About</a>
+    <a href="../../contact">Contact</a>
+  </nav>
+</div>
+<!--CMS_NAV-->
+<main class="cms-main">
+  <header class="cms-hero">
+    <a class="cms-hero__back" href="../">&larr; View All</a>
+    <h1 class="cms-hero__title">{{TITLE}}</h1>
+    <div class="cms-hero__image"><img src="{{HERO_IMAGE}}" alt="{{TITLE}}"></div>
+  </header>
+
+  <section class="cms-gallery">
+    <ul class="cms-gallery__track" data-cms-gallery-track>
+{{GALLERY_ITEMS}}
+    </ul>
+    <div class="cms-gallery__nav">
+      <button type="button" data-cms-gallery-prev aria-label="Previous">&larr;</button>
+      <button type="button" data-cms-gallery-next aria-label="Next">&rarr;</button>
+    </div>
+  </section>
+
+  <section class="cms-meta">
+    <div>
+      <p class="cms-meta__label">Year</p>
+      <p class="cms-meta__value">{{YEAR}}</p>
+    </div>
+    <div>
+      <p class="cms-meta__label">Overview</p>
+      <p class="cms-meta__value">{{OVERVIEW}}</p>
+    </div>
+    <div>
+      <p class="cms-meta__label">Discipline</p>
+      <p class="cms-meta__value">{{SERVICES}}</p>
+    </div>
+{{LIVE_LINK_BLOCK}}
+  </section>
+
+  <section class="cms-project-overview">{{PROJECT_OVERVIEW}}</section>
+</main>
+<!--CMS_FOOTER-->
+<script src="/assets/cms.js" defer></script>
+</body>
+</html>

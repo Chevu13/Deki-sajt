@@ -1,0 +1,35 @@
+backend:
+  name: github
+  repo: YOUR-GITHUB-USERNAME/tumenko-portfolio # TODO: replace with owner/repo after pushing to GitHub
+  branch: main
+  base_url: https://YOUR-VERCEL-DOMAIN.vercel.app # TODO: replace with your deployed Vercel URL
+
+media_folder: "assets/uploads"
+public_folder: "/assets/uploads"
+
+collections:
+  - name: "work"
+    label: "Work"
+    label_singular: "Project"
+    folder: "content/work"
+    create: true
+    slug: "{{slug}}"
+    identifier_field: title
+    fields:
+      - { label: "Title", name: "title", widget: "string" }
+      - { label: "Slug (URL)", name: "slug", widget: "string", hint: "Used in the page URL, e.g. my-project -> /work/my-project" }
+      - { label: "Status", name: "status", widget: "select", options: ["Live", "Draft"], default: "Live", hint: "Draft projects are not built or listed." }
+      - { label: "Year", name: "year", widget: "number", value_type: "int" }
+      - { label: "Services / Discipline", name: "services", widget: "list", default: ["Brand Identity"] }
+      - { label: "Overview", name: "overview", widget: "text", hint: "Short summary shown on the Work list card." }
+      - { label: "Live Link", name: "live_link", widget: "string", required: false }
+      - { label: "Hero Image", name: "hero_image", widget: "image" }
+      - label: "Gallery"
+        name: "gallery"
+        widget: "list"
+        summary: "{{fields.type}} — {{fields.alt}}"
+        fields:
+          - { label: "Type", name: "type", widget: "select", options: ["image", "video"], default: "image" }
+          - { label: "File", name: "src", widget: "file", hint: "Upload a photo (jpg/png) or a video (mp4)." }
+          - { label: "Alt text", name: "alt", widget: "string", required: false }
+      - { label: "Project Overview", name: "body", widget: "markdown", hint: "Longer case-study text shown at the bottom of the page." }

@@ -1,0 +1,3 @@
+User-agent: *
+Allow: /
+Sitemap: https://dtumenko-export-b7697.rehosted.page/_html4life/sitemap.xml
