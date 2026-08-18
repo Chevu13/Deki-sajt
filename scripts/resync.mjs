@@ -133,13 +133,15 @@ async function discoverPages() {
   return { pages, sitemapPath };
 }
 
-// Some page-router JS chunks are only referenced via a runtime manifest
-// (id -> hashed filename) built from string concatenation, which static
-// regex scanning of HTML can miss. After the page crawl, do extra passes
-// over every downloaded .mjs file re-scanning for `*.mjs` filename tokens
-// inside assets/animate, so lazily-loaded route/font chunks aren't skipped.
+// Some page-router JS chunks — and CMS collection data files (.framercms),
+// used by Framer's client-side router when soft-navigating between pages
+// that share a CMS collection — are only referenced via backtick template
+// literals inside minified JS, which the quote-only regex in
+// extractAssetPaths() doesn't match. After the page crawl, do extra passes
+// over every downloaded .mjs file re-scanning for these filename tokens
+// regardless of quote style, so nothing lazily-loaded gets skipped.
 async function resolveTransitiveChunks() {
-  const chunkRe = /[\w.\-$]+\.mjs/g;
+  const chunkRe = /[\w.\-$]+\.(?:mjs|framercms)/g;
   async function ensure(filename) {
     const local = path.join(ANIM_DIR, filename);
     if (fs.existsSync(local)) return false;

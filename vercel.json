@@ -1,4 +1,7 @@
 {
   "buildCommand": "npm run build",
-  "outputDirectory": "."
+  "outputDirectory": ".",
+  "rewrites": [
+    { "source": "/assets/animate/:filename.framercms", "destination": "/api/framercms/:filename" }
+  ]
 }
