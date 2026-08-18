@@ -1,7 +1,35 @@
 {
+  "cleanUrls": true,
+  "trailingSlash": false,
   "buildCommand": "npm run build",
   "outputDirectory": ".",
-  "rewrites": [
-    { "source": "/assets/animate/:filename.framercms", "destination": "/api/framercms/:filename" }
+  "headers": [
+    {
+      "source": "/assets/images/opt/(.*)",
+      "headers": [
+        {
+          "key": "Cache-Control",
+          "value": "public, max-age=31536000, immutable"
+        }
+      ]
+    },
+    {
+      "source": "/assets/(fonts|videos)/(.*)",
+      "headers": [
+        {
+          "key": "Cache-Control",
+          "value": "public, max-age=31536000, immutable"
+        }
+      ]
+    },
+    {
+      "source": "/assets/animate/(.*)",
+      "headers": [
+        {
+          "key": "Cache-Control",
+          "value": "public, max-age=300"
+        }
+      ]
+    }
   ]
 }

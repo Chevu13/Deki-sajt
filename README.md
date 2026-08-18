@@ -108,3 +108,58 @@ Newsletter forma (footer) i Contact forma nemaju definisan `action` — u origin
 ih je submit-ovao Framer-ov hosting backend, koji ne postoji van Framer-a. Da bi
 radile na Vercel-u, treba ih povezati na servis kao Formspree, Getform ili
 sopstveni API endpoint (dodavanjem `action="..."` i/ili malo JS-a).
+
+## Popravke — /work fatal error i ucitavanje slika (avg 2026)
+
+### 1. `/work` i CMS stranice su rusile stranicu (`Unexpected response length`)
+
+Framer-ov klijentski ruter povlaci CMS podatke iz `assets/animate/*.framercms`
+preko **svoje** konvencije `?range=od-do,od-do` (nije standardni HTTP `Range`
+header) i onda proverava da li je duzina odgovora tacno onolika kolika je
+trazena. To radi samo Framer-ov CDN — svaki drugi host (Vercel ukljucen) vrati
+ceo fajl, pa klijent baci `Request failed: Unexpected response length` i sruси
+stranicu. Ranije resenje sa serverless funkcijom (`api/framercms`) nije moglo da
+radi: Vercel `rewrites` primenjuje **posle** provere fajl sistema, a
+`.framercms` fajl fizicki postoji, tako da se rewrite nikad nije ni okinuo.
+
+Sada je zakrpljena sama funkcija koja radi taj fetch, u
+`assets/animate/kvjGSOTZZ.CoZxkceV.mjs`: skida **ceo** fajl (33 KB, kesira se u
+browseru i u memoriji po URL-u) i sece opsege lokalno. Nema servera, radi na
+bilo kom statickom hostingu. `api/framercms` i rewrite iz `vercel.json` su
+obrisani.
+
+> Ako ikad radis novi Framer/NocodeXport export, ova zakrpa se gubi — treba je
+> ponovo primeniti na novi `*.mjs` (trazi string `Unexpected response length`).
+
+### 2. Slike (bagovanje na startu)
+
+Framer u `srcset`-u koristi svoj CDN (`?scale-down-to=512&width=8479...`). Van
+Framer hostinga ti parametri ne rade nista, pa je browser za svaki thumbnail
+skidao ORIGINAL — hero slika je bila 8,5 MB, ukupno ~55 MB slika.
+
+`scripts/optimize-images.py` je:
+- napravio WebP varijante (512/1024/2048/2560 px) u `assets/images/opt/`
+- prepisao `src` i `srcset` u svim HTML i `.mjs` fajlovima, sa tacnim `w`
+  deskriptorima (hero je sada ~8 KB na 1024 px, ~430 KB na 2560 px)
+- generisao `assets/lqip.css` — mali zamucen placeholder (base64, ~14 KB ukupno)
+  kao `background-image` svake slike, pa se dok se prava slika ucitava vidi
+  blur umesto praznog pravougaonika (cisti CSS, React ga ne moze pregaziti)
+- dodao `preload` + `fetchpriority="high"` za hero na home-u
+- neiskoriscene originale sklonio u `assets/images/_originals/`
+  (`.vercelignore` ih izbacuje iz deploy-a; drzi ih u repo-u kao izvor)
+
+Ponovno pokretanje posle dodavanja novih slika:
+```bash
+pip install pillow
+python3 scripts/optimize-images.py
+npm run build
+```
+
+`vercel.json` sada ima i `cleanUrls` + dugotrajni cache za `assets/images/opt/`,
+fontove i video.
+
+### Napomena o testiranju
+
+Preview deploy URL-ovi (`...-lv5fj70aw-...vercel.app`) su zasticeni Vercel
+login-om, pa ih ne mogu otvoriti spolja — testiraj na production domenu i uradi
+hard refresh (Cmd/Ctrl+Shift+R) jer je stari `.mjs` mozda kesiran.
