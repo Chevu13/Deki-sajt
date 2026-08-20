@@ -1,0 +1,56 @@
+SEO + GOOGLE ANALYTICS ISPRAVKE ZA dtumenko.com — šta je promenjeno
+=====================================================================
+
+NAPOMENA: Ovo je AŽURIRANA verzija zipa (dodat Google Analytics). Ako si
+već dobio raniji zip bez Analytics-a, koristi OVAJ umesto njega — sadrži
+sve iz starog plus novo.
+
+Ovaj zip sadrži SAMO fajlove koji su izmenjeni ili dodati (ne ceo projekat —
+slike, video i fontovi su nepromenjeni, već postoje na hostingu).
+
+Struktura foldera unutar zipa je ista kao u glavnom repozitorijumu, tako da
+se ovi fajlovi mogu prekopirati direktno preko postojećih (overwrite) u
+tvom lokalnom kloniranom repou, pa push-ovati na GitHub kao i obično.
+
+IZMENJENI / DODATI FAJLOVI:
+
+1. robots.txt (izmenjen)
+   - Sitemap linija sad pokazuje na https://www.dtumenko.com/sitemap.xml
+
+2. sitemap.xml (nov fajl, ide u koren projekta pored robots.txt)
+   - Sadrži svih 11 stranica sajta
+
+3. index.html, about/index.html, contact/index.html (izmenjeni)
+   - Title/description ispravljeni, puno ime "Dejan Tumenko" dodato
+   - Google Analytics (GA4) tag dodat u <head>
+
+4. work/cro-sea-villas/index.html
+   work/falco-gin/index.html
+   work/adria-design-biennale/index.html
+   work/pletho/index.html
+   work/nordarch-studio/index.html
+   work/vellor-residency/index.html (svih 6 izmenjeno)
+   - Uklonjen "— My Framer Site" iz naslova
+   - Jedinstven title/description za svaki projekat
+   - Google Analytics (GA4) tag dodat u <head>
+
+5. templates/_head.html (izmenjen)
+   - Google Analytics (GA4) tag dodat — ovo je template iz kog se
+     generišu BUDUĆE CMS-dodate projekt stranice (scripts/build.mjs),
+     tako da će i one automatski imati Analytics tag
+
+GOOGLE ANALYTICS — DETALJI:
+   - Napravljen GA4 property "dtumenko.com" (nalog "dtumenko")
+   - Measurement ID: G-133QGW407E
+   - Tag je već ubačen u svih 9 HTML stranica + template, ne treba ništa
+     dodatno da se radi — samo push-ovati fajlove
+
+NAPOMENA: work/index.html (lista svih projekata) NIJE ručno menjan jer se
+taj fajl automatski regeneriše iz scripts/build.mjs prilikom svakog builda
+na Vercelu (koristi templates/_head.html koji SAD već ima Analytics tag,
+pa će se on pokupiti automatski na sledećem build-u).
+
+POSLE OVOG DEPLOY-A, JOŠ TREBA:
+- Dodati DNS TXT record za Google Search Console verifikaciju domena
+  (vrednost je poslata Dejanu odvojeno — pita njega)
+- Ažuriranje linkova ka sajtu na Behance/Dribbble/LinkedIn/Instagram/X

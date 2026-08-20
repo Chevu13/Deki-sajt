@@ -1,4 +1,4 @@
 User-agent: *
 Allow: /
-Sitemap: https://dtumenko-export-b7697.rehosted.page/_html4life/sitemap.xml
+Sitemap: https://www.dtumenko.com/sitemap.xml
 Disallow: /admin-preview/
