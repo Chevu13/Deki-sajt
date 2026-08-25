@@ -20,6 +20,7 @@ assets/animate                 Framer/Motion runtime (samo za Framer stranice)
 assets/uploads                 Slike/video koje CMS panel upload-uje
 assets/cms.css, cms.js         Stilovi/JS za CMS-generisane stranice (bez Framer JS-a)
 assets/legacy-gallery.js       Dodaje slike preko Framer-ovih sest u 6 originalnih stranica
+assets/framer-nav.js           Gasi Framer klijentsku navigaciju i cuva <title> posle hidracije
 
 content/work/*.md              Podaci za nove projekte (izvor za CMS panel)
 content/legacy-work.json       Podaci za originalnih 6 projekata (za work listu)
@@ -143,6 +144,24 @@ Jedina razlika u odnosu na originalne slajdove: Framer svoje otkriva scroll
 animacijom sticky sekcije, na koju se spolja ne može zakačiti, pa se dodate
 prikazuju kratkim fade-om umesto scroll-sinhronizovanim. Sve ostalo — položaj,
 dimenzije, razmak, lazy loading, dužina scroll-a — isto je.
+
+### Zasto je Framer-ova klijentska navigacija ugasena
+
+Framer export nosi svoj router: klik na interni link se presretne i stranica se
+iscrta na klijentu, iz podataka koje Framer nosi sa sobom. Posle prelaska na
+sopstveni CMS to daje pogresan prikaz — `/work` generise `scripts/build.mjs`, a
+sadrzaj originalnih stranica menja panel prepisom fajlova, i Framer o tome ne
+zna nista. Klik na "Works" sa naslovne je prikazivao staru listu bez novih
+projekata, sve dok se stranica ne osvezi rucno.
+
+[assets/framer-nav.js](assets/framer-nav.js) zato svaki interni link vodi kao
+obicno ucitavanje stranice (capture faza + `stopImmediatePropagation`, pa Framer
+ov rukovalac klik nikad ne vidi). Gubi se Framer prelaz izmedju stranica; dobija
+se to da se uvek vidi ono sto je stvarno na sajtu.
+
+Isti skript vraca i `<title>`: Framer ga posle hidracije prepisuje genericnim
+naslovom iz svojih podataka, pa bi SEO naslovi vazili samo do hidracije — a
+Google izvrsava JS.
 
 Raspored, tipografija i animacije tih stranica i dalje dolaze iz Framer export-a
 i panel ih ne dira — kao ni Contact/Privacy Policy/404.

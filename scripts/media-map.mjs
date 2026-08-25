@@ -106,6 +106,29 @@ function findSources(baseFile, tokens) {
 const EXTRA_BLOCK_ID = "cms-extra-media";
 const EXTRA_SCRIPT = '<script src="/assets/legacy-gallery.js" defer></script>';
 
+// Sve stranice koje nosi Framer runtime — na njima treba iskljuciti njegovu
+// klijentsku navigaciju, jer bi prikazala stanje pre izmena iz panela.
+const FRAMER_PAGES = [
+  "index.html",
+  "about/index.html",
+  "contact/index.html",
+  "privacy-policy/index.html",
+  "404/index.html",
+];
+
+const NAV_SCRIPT = '<script src="/assets/framer-nav.js" defer></script>';
+
+function ensureNavScript(file) {
+  const full = path.join(ROOT, file);
+  if (!fs.existsSync(full)) return false;
+
+  const html = fs.readFileSync(full, "utf8");
+  if (html.includes("/assets/framer-nav.js")) return false;
+
+  fs.writeFileSync(full, html.replace("</body>", NAV_SCRIPT + "\n</body>"), "utf8");
+  return true;
+}
+
 function extraBlock(known, images) {
   return (
     '<script type="application/json" id="' + EXTRA_BLOCK_ID + '">' +
@@ -137,6 +160,9 @@ function ensureExtraHooks(file, known) {
 
   if (!html.includes("/assets/legacy-gallery.js")) {
     html = html.replace("</body>", EXTRA_SCRIPT + "\n</body>");
+  }
+  if (!html.includes("/assets/framer-nav.js")) {
+    html = html.replace("</body>", NAV_SCRIPT + "\n</body>");
   }
 
   if (html !== before) fs.writeFileSync(full, html, "utf8");
@@ -343,6 +369,12 @@ function main() {
   const legacyManifest = buildLegacy();
   console.log("\n— Home i About —");
   buildPages(legacyManifest);
+
+  const patched = FRAMER_PAGES.filter(ensureNavScript);
+  console.log(
+    `\n— navigacija —\nframer-nav.js: ${patched.length ? "dodat u " + patched.join(", ") : "vec svuda"}`
+  );
+
   console.log("\nnapisano: content/legacy-images.json, content/pages.json");
 }
 
