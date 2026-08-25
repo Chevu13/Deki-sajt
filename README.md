@@ -67,29 +67,49 @@ Editor ima ista polja za obe vrste projekata: Title, Status, Slug, Details
 (Overview, Project Overview, Year, Service 1–3, Live Link) i Images
 (**Thumb, Image 1–6, video**).
 
-| Vrsta | Izvor | Šta se menja |
-|---|---|---|
-| **CMS projekti** | `content/work/*.md` | sve; `scripts/build.mjs` iz njih generiše `work/<slug>/index.html` |
-| **Framer projekti** (originalnih 6) | `content/legacy-work.json` + sam HTML | kartica na `/work`, **sve slike i video u stranici**, Status, brisanje |
+Panel ima dve kolekcije u sidebaru:
 
-### Kako se menjaju slike u originalnih 6 stranica
+| Kolekcija | Stavke | Izvor | Šta se menja |
+|---|---|---|---|
+| **Work Items** | CMS projekti | `content/work/*.md` | sve; `scripts/build.mjs` iz njih generiše `work/<slug>/index.html` |
+| **Work Items** | Framer projekti (originalnih 6) | `content/legacy-work.json` + sam HTML | kartica na `/work`, **sve slike i video u stranici**, Status, brisanje |
+| **Pages** | Home, About | `content/pages.json` + sam HTML | Home: hero slika i tekst ispod hero banera. About: tri slike u sekciji |
 
-Te stranice nemaju Markdown izvor — one su statički Framer export. Panel im
-menja slike tako što prepiše sam HTML, isto što radi i `scripts/optimize-images.py`.
-Mapa "koja slika je koji slot" je [content/legacy-images.json](content/legacy-images.json),
-koju pravi `npm run legacy-images` čitajući redosled slika iz HTML-a (na svih 6
-stranica je identičan: logo, Thumb, šest slika galerije, zajednička footer slika).
+### Kako se menja sadržaj statičkih Framer stranica
 
-Zamena pogađa **tri mesta** u stranici: `srcset` listu, `src` atribut, i JSON
-payload koji Framer ugrađuje u stranicu za React hidraciju. Preskočiti payload
-znači ostaviti stare URL-ove koje React može da vrati na ekran — zato se menjaju
-sva tri. Testirano: posle zamene i pune hidracije stara slika se ne vraća.
+Te stranice nemaju Markdown izvor — one su export iz Framera. Panel im menja
+sadržaj tako što prepiše same izvorne fajlove, isto što radi i
+`scripts/optimize-images.py` kad prepisuje putanje slika.
+
+Mape "šta stoji gde" pravi `npm run media-map`:
+
+```
+content/legacy-images.json   6 project stranica: Thumb, Image 1–6, video
+content/pages.json           Home i About: slike + tekst
+```
+
+Zamena mora da pogodi **svako mesto na kom sadržaj stoji**, inače React posle
+hidracije vrati staro stanje:
+
+1. `srcset` lista (više veličina iste slike)
+2. `src` atribut
+3. **JSON payload** koji Framer ugrađuje u stranicu za hidraciju
+4. **page chunk** u `assets/animate/*.mjs` — Home i About renderuju hero sliku i
+   tekst odatle, ne iz HTML-a
+
+Zato svaka stavka u mapi nosi i listu `sources`. Project stranice imaju samo
+svoj HTML; Home i About imaju i po jedan `.mjs` chunk. Tekst se escape-uje po
+tipu fajla — HTML entiteti u `.html`, a backslash / backtick / `${` u `.mjs`,
+gde tekst stoji u template literalu.
+
+Kad se zameni Thumb nekog od 6 projekata, prepisuje se i `index.html` — naslovna
+prikazuje thumbove izabranih radova, pa bi inače ostala sa starom slikom.
 
 Raspored, tipografija i animacije tih stranica i dalje dolaze iz Framer export-a
-i panel ih ne dira — kao ni Home/About/Contact/Privacy Policy/404.
+i panel ih ne dira — kao ni Contact/Privacy Policy/404.
 
-> Posle novog Framer export-a (`scripts/resync.mjs`) pokreni `npm run legacy-images`
-> da se mapa osveži, jer se hash imena slika menjaju.
+> Posle novog Framer export-a (`scripts/resync.mjs`) pokreni `npm run media-map`
+> da se mape osveže, jer se hash imena slika i chunk-ova menjaju.
 
 **Jednokratno podešavanje** (posle prvog Vercel deploy-a):
 
@@ -127,8 +147,9 @@ admin/cms.js              cela logika: GitHub API, tabela, editor, upload
 admin/config.yml          konfiguracija za Decap fallback
 admin-preview/            isti panel u demo režimu — bez logina, ništa se ne snima
 admin-decap/              Decap CMS, zadržan kao rezerva ako panel ikad zabaguje
-content/legacy-images.json  mapa slika originalnih 6 stranica
-scripts/legacy-images.mjs   generator te mape (npm run legacy-images)
+content/legacy-images.json  mapa medija u 6 project stranica
+content/pages.json          mapa medija i teksta na Home i About
+scripts/media-map.mjs       generator obe mape (npm run media-map)
 ```
 
 **Poznato ponašanje:** ako se projektu naknadno promeni Slug, stara generisana

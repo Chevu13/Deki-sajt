@@ -1,0 +1,228 @@
+#!/usr/bin/env node
+// Pravi mape "koji medij stoji gde" za staticke Framer stranice, da bi CMS
+// panel mogao da ih prikaze i menja. Te stranice nemaju Markdown izvor — one
+// su export iz Framera — pa se mapa izvlaci iz samog HTML-a.
+//
+//   content/legacy-images.json   6 originalnih project stranica
+//   content/pages.json           Home i About (hero, tekst ispod hero banera,
+//                                slike u About sekciji)
+//
+// `match` je token koji panel trazi u HTML-u pri zameni: kod Framer slika to je
+// hash bez sufiksa velicine (`image-d7d720ef`), jer ista slika stoji u
+// `srcset`-u u vise velicina. Kad se slika zameni uploadom, `match` postaje
+// puna putanja novog fajla. Panel odrzava oba fajla posle svake izmene.
+//
+// Pokretanje: npm run media-map   (potrebno posle novog Framer exporta)
+
+import fs from "node:fs";
+import path from "node:path";
+
+const ROOT = path.resolve(import.meta.dirname, "..");
+const LEGACY_FILE = path.join(ROOT, "content/legacy-work.json");
+const LEGACY_OUT = path.join(ROOT, "content/legacy-images.json");
+const PAGES_OUT = path.join(ROOT, "content/pages.json");
+
+// Slike koje se javljaju na svakoj stranici i nisu deo sadrzaja.
+const CHROME_IMAGES = new Set([
+  "image-9299c3ff", // logo u navigaciji (desktop + mobile varijanta)
+  "image-60b39321", // slika u footer/CTA sekciji, identicna na svim stranicama
+]);
+
+const GALLERY_SLOTS = 6;
+
+const PAGES = [
+  { id: "home", label: "Home", file: "index.html", url: "/", withText: true },
+  { id: "about", label: "About", file: "about/index.html", url: "/about", withText: false },
+];
+
+function readHtml(file) {
+  const full = path.join(ROOT, file);
+  return fs.existsSync(full) ? fs.readFileSync(full, "utf8") : null;
+}
+
+// Slike redosledom pojavljivanja. Framer renderuje odvojene desktop/mobile
+// varijante iste sekcije, pa se ista slika javlja vise puta — dedupira se uz
+// cuvanje redosleda.
+function orderedImages(html, skip) {
+  const tags = html.match(/<img\b[^>]*>/g) || [];
+  const seen = new Set();
+  const out = [];
+
+  for (const tag of tags) {
+    const src = /\ssrc="(\/assets\/images\/opt\/(image-[a-f0-9]+)-\d+\.webp)"/.exec(tag);
+    if (!src) continue;
+    const base = src[2];
+    if (CHROME_IMAGES.has(base) || seen.has(base) || (skip && skip.has(base))) continue;
+    seen.add(base);
+    const alt = /\salt="([^"]*)"/.exec(tag);
+    out.push({ match: base, src: src[1], alt: alt ? alt[1] : "" });
+  }
+  return out;
+}
+
+function findVideo(html) {
+  const match = /<video\b[^>]*\ssrc="(\/assets\/videos\/[^"]+)"/.exec(html);
+  return match ? { match: match[1], src: match[1] } : null;
+}
+
+// Framer stranicu ne opisuje samo HTML. Deo sadrzaja — na Home-u hero slika i
+// uvodni tekst — stoji i u page chunk-u iz kog React renderuje, i on posle
+// hidracije pregazi HTML. Zato se za svaki slot pamti i koji `.mjs` fajl ga
+// sadrzi, pa panel menja sve izvore odjednom. (Isto je radio i
+// scripts/optimize-images.py kad je prepisivao putanje slika.)
+function findSources(baseFile, tokens) {
+  const sources = [baseFile];
+  const dir = path.join(ROOT, "assets/animate");
+  if (!fs.existsSync(dir) || !tokens.length) return sources;
+
+  for (const name of fs.readdirSync(dir)) {
+    if (!name.endsWith(".mjs")) continue;
+    const content = fs.readFileSync(path.join(dir, name), "utf8");
+    if (tokens.some((token) => content.includes(token))) {
+      sources.push("assets/animate/" + name);
+    }
+  }
+  return sources;
+}
+
+function buildLegacy() {
+  const legacy = JSON.parse(fs.readFileSync(LEGACY_FILE, "utf8"));
+  const manifest = {};
+
+  for (const project of legacy) {
+    const html = readHtml(`work/${project.slug}/index.html`);
+    if (!html) {
+      console.warn(`preskacem ${project.slug} — nema work/${project.slug}/index.html`);
+      continue;
+    }
+
+    const images = orderedImages(html);
+    if (images.length < 1 + GALLERY_SLOTS) {
+      console.warn(`upozorenje: ${project.slug} ima ${images.length} slika, ocekivano ${1 + GALLERY_SLOTS}`);
+    }
+
+    const [thumb, ...gallery] = images;
+    const video = findVideo(html);
+    const slots = [thumb, ...gallery.slice(0, GALLERY_SLOTS), video].filter(Boolean);
+
+    manifest[project.slug] = {
+      thumb: thumb || null,
+      images: gallery.slice(0, GALLERY_SLOTS),
+      video: video,
+      sources: findSources(
+        `work/${project.slug}/index.html`,
+        slots.map((slot) => slot.match)
+      ),
+    };
+
+    console.log(
+      `${project.slug}: thumb + ${Math.min(gallery.length, GALLERY_SLOTS)} slika` +
+        (video ? " + video" : "") +
+        `, ${manifest[project.slug].sources.length} izvor(a)`
+    );
+  }
+
+  fs.writeFileSync(LEGACY_OUT, JSON.stringify(manifest, null, 2) + "\n", "utf8");
+  return manifest;
+}
+
+// Tekst ispod hero banera na Home-u.
+//
+// Home prikazuje i kartice izabranih projekata, ciji su opisi duzi od uvodnog
+// pasusa — pa "najduzi tekst" nije dovoljno dobar kriterijum. Razlikuju se po
+// broju pojavljivanja: tekst kartice dolazi iz Framer CMS kolekcije i stoji u
+// stranici tri puta (desktop varijanta, mobile varijanta, JSON payload za
+// hidraciju), dok je uvodni pasus obican staticki tekst i javlja se tacno
+// jednom. Uzima se najduzi takav — i to je ujedno uslov da zamena bude
+// jednoznacna.
+function findIntroText(html) {
+  const body = html
+    .replace(/<script\b[\s\S]*?<\/script>/gi, "")
+    .replace(/<style\b[\s\S]*?<\/style>/gi, "");
+
+  const candidates = [
+    ...new Set((body.match(/>[^<>]{80,}</g) || []).map((c) => c.slice(1, -1).trim())),
+  ];
+
+  const unique = candidates.filter(
+    (text) => /[a-z]/.test(text) && html.split(text).length - 1 === 1
+  );
+
+  unique.sort((a, b) => b.length - a.length);
+  return unique[0] || null;
+}
+
+function buildPages(legacyManifest) {
+  // Home prikazuje thumbove izabranih projekata — oni se menjaju kroz sam
+  // projekat, ne kroz stranicu, pa se ovde preskacu.
+  const projectImages = new Set();
+  for (const entry of Object.values(legacyManifest)) {
+    if (entry.thumb) projectImages.add(entry.thumb.match);
+    entry.images.forEach((image) => projectImages.add(image.match));
+  }
+
+  const pages = {};
+
+  for (const page of PAGES) {
+    const html = readHtml(page.file);
+    if (!html) {
+      console.warn(`preskacem ${page.id} — nema ${page.file}`);
+      continue;
+    }
+
+    const images = orderedImages(html, projectImages).map((image, index) => ({
+      key: page.id === "home" && index === 0 ? "hero" : "image" + (index + 1),
+      label: page.id === "home" && index === 0 ? "Hero" : "Image " + (index + 1),
+      match: image.match,
+      src: image.src,
+    }));
+
+    const texts = [];
+    if (page.withText) {
+      const intro = findIntroText(html);
+      if (intro) {
+        const occurrences = html.split(intro).length - 1;
+        if (occurrences !== 1) {
+          console.warn(`upozorenje: uvodni tekst na ${page.id} se javlja ${occurrences}x`);
+        }
+        texts.push({
+          key: "intro",
+          label: "Tekst ispod hero banera",
+          value: intro,
+          rows: 4,
+        });
+      } else {
+        console.warn(`upozorenje: nisam nasao uvodni tekst na ${page.id}`);
+      }
+    }
+
+    const tokens = images.map((image) => image.match).concat(texts.map((text) => text.value));
+
+    pages[page.id] = {
+      label: page.label,
+      file: page.file,
+      url: page.url,
+      images: images,
+      texts: texts,
+      sources: findSources(page.file, tokens),
+    };
+
+    console.log(
+      `${page.id}: ${images.length} slika` +
+        (texts.length ? `, ${texts.length} tekst` : "") +
+        `, ${pages[page.id].sources.length} izvor(a)`
+    );
+  }
+
+  fs.writeFileSync(PAGES_OUT, JSON.stringify(pages, null, 2) + "\n", "utf8");
+}
+
+function main() {
+  console.log("— project stranice —");
+  const legacyManifest = buildLegacy();
+  console.log("\n— Home i About —");
+  buildPages(legacyManifest);
+  console.log("\nnapisano: content/legacy-images.json, content/pages.json");
+}
+
+main();

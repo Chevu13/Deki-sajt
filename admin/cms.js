@@ -74,6 +74,7 @@
     play: svg('<path d="M8 5.5v13l10-6.5-10-6.5Z"/>'),
     trash: svg('<path d="M4 7h16M9 7V5h6v2M6 7l1 13h10l1-13"/>'),
     logout: svg('<path d="M9 4H6a2 2 0 0 0-2 2v12a2 2 0 0 0 2 2h3M16 16l4-4-4-4M20 12H10"/>'),
+    file: svg('<path d="M14 3H7a2 2 0 0 0-2 2v14a2 2 0 0 0 2 2h10a2 2 0 0 0 2-2V8l-5-5Z"/><path d="M14 3v5h5"/>'),
   };
 
   var LOGO = '<img class="logo" src="/assets/images/image-882b5959.png" alt="Dejan Tumenko">';
@@ -278,8 +279,16 @@
       });
     });
 
-    return Promise.all([legacy, cms]).then(function (groups) {
-      return groups[0].concat(groups[1]);
+    var pages = this.readFile(CFG.pagesFile).then(function (text) {
+      var map = text ? JSON.parse(text) : {};
+      state.pagesManifest = map;
+      return Object.keys(map).map(function (id) {
+        return fromPage(id, map[id]);
+      });
+    });
+
+    return Promise.all([legacy, cms, pages]).then(function (groups) {
+      return groups[0].concat(groups[1], groups[2]);
     });
   };
 
@@ -307,15 +316,24 @@
         });
     }
 
-    return Promise.all([getJson(CFG.legacyFile, []), getJson(CFG.legacyImagesFile, {})]).then(
-      function (results) {
-        state.legacyManifest = results[1];
-        self.items = results[0].map(function (row) {
+    return Promise.all([
+      getJson(CFG.legacyFile, []),
+      getJson(CFG.legacyImagesFile, {}),
+      getJson(CFG.pagesFile, {}),
+    ]).then(function (results) {
+      state.legacyManifest = results[1];
+      state.pagesManifest = results[2];
+      self.items = results[0]
+        .map(function (row) {
           return fromLegacy(row, results[1][row.slug]);
-        });
-        return self.items.slice();
-      }
-    );
+        })
+        .concat(
+          Object.keys(results[2]).map(function (id) {
+            return fromPage(id, results[2][id]);
+          })
+        );
+      return self.items.slice();
+    });
   };
 
   DemoStore.prototype.readFile = function () {
@@ -426,6 +444,10 @@
       thumb: { src: thumb.src, alt: thumb.alt || "", match: thumb.match },
       images: images,
       video: (manifest && manifest.video) || { src: "", match: "" },
+      sources:
+        manifest && manifest.sources && manifest.sources.length
+          ? manifest.sources.slice()
+          : ["work/" + row.slug + "/index.html"],
     };
   }
 
@@ -438,6 +460,36 @@
       overview: item.overview,
       hero_image: item.cardImage || item.thumb.src || "",
       status: item.status === "Draft" ? "Draft" : undefined,
+    };
+  }
+
+  // Home i About su takodje staticki Framer export — nemaju ni Markdown ni
+  // karticu, pa im se menjaju samo imenovani slotovi iz content/pages.json.
+  function fromPage(id, entry) {
+    return {
+      key: "page:" + id,
+      kind: "page",
+      id: id,
+      title: entry.label || id,
+      file: entry.file,
+      url: entry.url || "/",
+      slug: "",
+      status: "Live",
+      year: "",
+      overview: "",
+      projectOverview: "",
+      images: (entry.images || []).map(function (image) {
+        return { key: image.key, label: image.label, match: image.match, src: image.src };
+      }),
+      texts: (entry.texts || []).map(function (text) {
+        return {
+          key: text.key,
+          label: text.label,
+          value: text.value,
+          rows: text.rows || 4,
+        };
+      }),
+      sources: (entry.sources || [entry.file]).slice(),
     };
   }
 
@@ -468,6 +520,8 @@
     user: null,
     items: [],
     legacyManifest: {},
+    pagesManifest: {},
+    collection: "work",
     view: "list",
     selectedKey: null,
     draft: null,
@@ -585,10 +639,19 @@
 
   /* -------------------------------------------------------------- derive */
 
+  function itemsInCollection(name) {
+    return state.items.filter(function (item) {
+      return name === "pages" ? item.kind === "page" : item.kind !== "page";
+    });
+  }
+
   function visibleItems() {
     var query = state.query.trim().toLowerCase();
-    var rows = state.items.filter(function (item) {
-      if (state.statusFilter !== "all" && item.status !== state.statusFilter) return false;
+    var rows = itemsInCollection(state.collection).filter(function (item) {
+      // Stranice nemaju Live/Draft — filter po statusu vazi samo za projekte.
+      if (item.kind !== "page" && state.statusFilter !== "all" && item.status !== state.statusFilter) {
+        return false;
+      }
       if (!query) return true;
       return (
         item.title.toLowerCase().indexOf(query) >= 0 ||
@@ -746,11 +809,8 @@
         }),
       ]),
       el("div", { class: "sidebar__list" }, [
-        el("button", { class: "collection is-active" }, [
-          el("span", { html: ICONS.database }),
-          el("span", { text: "Work Items" }),
-          el("span", { class: "collection__count", text: String(state.items.length) }),
-        ]),
+        collectionButton("work", "Work Items", ICONS.database),
+        collectionButton("pages", "Pages", ICONS.file),
         el("button", { class: "collection collection--add", onclick: createItem }, [
           el("span", { html: ICONS.plus }),
           el("span", { text: "Add..." }),
@@ -759,38 +819,70 @@
     ]);
   }
 
+  function collectionButton(name, label, icon) {
+    return el(
+      "button",
+      {
+        class: "collection" + (state.collection === name ? " is-active" : ""),
+        onclick: function () {
+          if (state.collection === name) return;
+          state.collection = name;
+          state.checked = {};
+          render();
+        },
+      },
+      [
+        el("span", { html: icon }),
+        el("span", { text: label }),
+        el("span", {
+          class: "collection__count",
+          text: String(itemsInCollection(name).length),
+        }),
+      ]
+    );
+  }
+
   function renderMain() {
     if (state.view === "detail") return el("main", { class: "main" }, [renderEditor()]);
     return el("main", { class: "main" }, [renderToolbar(), renderTable()]);
   }
 
   function renderToolbar() {
+    // Stranice su fiksne — ne dodaju se, ne brisu i nemaju status.
+    var isPages = state.collection === "pages";
+
     return el("div", { class: "toolbar" }, [
-      el("button", { class: "icon-btn", title: "Novi projekat", onclick: createItem }, [
-        el("span", { html: ICONS.plus }),
-      ]),
-      el(
-        "button",
-        {
-          class: "icon-btn" + (state.sortBy !== "manual" ? " is-active" : ""),
-          title: "Sortiraj",
-          onclick: function (event) {
-            openSortMenu(event.currentTarget);
-          },
-        },
-        [el("span", { html: ICONS.sort })]
-      ),
-      el(
-        "button",
-        {
-          class: "icon-btn" + (state.statusFilter !== "all" ? " is-active" : ""),
-          title: "Filtriraj",
-          onclick: function (event) {
-            openFilterMenu(event.currentTarget);
-          },
-        },
-        [el("span", { html: ICONS.filter })]
-      ),
+      isPages
+        ? null
+        : el("button", { class: "icon-btn", title: "Novi projekat", onclick: createItem }, [
+            el("span", { html: ICONS.plus }),
+          ]),
+      isPages
+        ? null
+        : el(
+            "button",
+            {
+              class: "icon-btn" + (state.sortBy !== "manual" ? " is-active" : ""),
+              title: "Sortiraj",
+              onclick: function (event) {
+                openSortMenu(event.currentTarget);
+              },
+            },
+            [el("span", { html: ICONS.sort })]
+          ),
+      isPages
+        ? null
+        : el(
+            "button",
+            {
+              class: "icon-btn" + (state.statusFilter !== "all" ? " is-active" : ""),
+              title: "Filtriraj",
+              onclick: function (event) {
+                openFilterMenu(event.currentTarget);
+              },
+            },
+            [el("span", { html: ICONS.filter })]
+          ),
       el("div", { class: "toolbar__search" }, [
         el("input", {
           type: "search",
@@ -840,7 +932,60 @@
     refreshTable();
   }
 
+  function renderPagesTable() {
+    var rows = visibleItems();
+
+    var head = el("thead", {}, [
+      el("tr", {}, [
+        el("th", { class: "col-title", text: "Page" }),
+        el("th", { class: "col-slug", text: "URL" }),
+        el("th", { class: "col-text", text: "Slike" }),
+        el("th", { class: "col-text", text: "Tekst" }),
+        el("th", { class: "col-actions" }),
+      ]),
+    ]);
+
+    var body = el(
+      "tbody",
+      {},
+      rows.map(function (item) {
+        return el("tr", {}, [
+          el("td", {
+            class: "col-title cell-title",
+            text: item.title,
+            onclick: function () {
+              openItem(item.key);
+            },
+          }),
+          el("td", { class: "col-slug", text: item.url }),
+          el("td", { class: "col-text", text: item.images.length + " slika" }),
+          el("td", {
+            class: "col-text",
+            text: item.texts.length ? item.texts[0].value : "—",
+          }),
+          el("td", { class: "col-actions" }, [
+            el(
+              "button",
+              {
+                class: "icon-btn",
+                title: "Otvori stranicu na sajtu",
+                onclick: function () {
+                  window.open(CFG.siteUrl + item.url, "_blank", "noopener");
+                },
+              },
+              [el("span", { html: ICONS.play })]
+            ),
+          ]),
+        ]);
+      })
+    );
+
+    return el("div", { class: "table-wrap" }, [el("table", { class: "table" }, [head, body])]);
+  }
+
   function renderTable() {
+    if (state.collection === "pages") return renderPagesTable();
+
     var rows = visibleItems();
     var allChecked =
       rows.length > 0 &&
@@ -1108,6 +1253,7 @@
   function createItem() {
     if (state.dirty && !confirm("Imas nesacuvane izmene. Napustiti ih?")) return;
     dropUnsavedNew(null);
+    state.collection = "work";
     var item = emptyItem();
     state.items.push(item);
     state.selectedKey = item.key;
@@ -1127,8 +1273,70 @@
     if (bar) bar.parentNode.replaceChild(renderTopbar(), bar);
   }
 
+  function renderPageEditor(draft) {
+    var fields = [];
+
+    fields.push(
+      fieldRow(
+        "Page",
+        el("input", { class: "input", value: draft.title, disabled: true }),
+        null,
+        el("p", { class: "field__hint" }, [
+          el("span", { html: ICONS.globe }),
+          el("span", { text: CFG.siteUrl.replace(/^https?:\/\//, "") + draft.url }),
+        ])
+      )
+    );
+
+    if (draft.texts.length) {
+      fields.push(sectionRow("Tekst"));
+      draft.texts.forEach(function (text) {
+        fields.push(
+          fieldRow(
+            text.label,
+            el("textarea", {
+              class: "textarea",
+              rows: text.rows,
+              value: text.value,
+              oninput: function (event) {
+                text.value = event.target.value;
+                markDirty();
+              },
+            })
+          )
+        );
+      });
+    }
+
+    fields.push(sectionRow("Images"));
+    draft.images.forEach(function (image) {
+      fields.push(fieldRow(image.label, mediaSlot(image, "image")));
+    });
+
+    fields.push(
+      fieldRow(
+        "",
+        el("p", {
+          class: "field__hint",
+          text:
+            "Ovo je originalna Framer stranica. Odavde se menjaju slike i tekst; " +
+            "raspored i animacije dolaze iz Framer export-a.",
+        })
+      )
+    );
+
+    return el("div", { class: "editor" }, [
+      el("div", { class: "editor__inner" }, [
+        el("button", { class: "editor__close", onclick: closeEditor, html: ICONS.close }),
+        el("div", {}, fields),
+      ]),
+    ]);
+  }
+
   function renderEditor() {
     var draft = state.draft;
+    if (draft.kind === "page") return renderPageEditor(draft);
+
     var isLegacy = draft.kind === "legacy";
     var fields = [];
 
@@ -1493,7 +1701,7 @@
   /* --------------------------------------------------------------- write */
 
   function stagedFilesFor(item) {
-    var used = [item.thumb.src, item.video.src].concat(
+    var used = [item.thumb && item.thumb.src, item.video && item.video.src].concat(
       item.images.map(function (image) {
         return image.src;
       })
@@ -1619,7 +1827,9 @@
         state.saving = false;
         state.dirty = false;
         var key =
-          draft.kind === "legacy"
+          draft.kind === "page"
+            ? "page:" + draft.id
+            : draft.kind === "legacy"
             ? "legacy:" + draft.slug
             : "cms:" + (draft.file || CFG.contentDir + "/" + draft.slug + ".md");
         var refreshed = findItem(key);
@@ -1646,7 +1856,118 @@
       });
   }
 
+  // Isti tekst stoji u dva oblika: u telu HTML-a i u template literalu unutar
+  // page chunk-a. Escape zavisi od toga u koji fajl se upisuje.
+  function escapeForFile(text, path) {
+    var value = String(text);
+    if (/\.mjs$/i.test(path)) {
+      // JS template literal — backslash, backtick i pocetak interpolacije.
+      return value
+        .replace(/\\/g, "\\\\")
+        .replace(/`/g, "\\`")
+        .replace(/\$\{/g, "\\${");
+    }
+    // Telo HTML-a; navodnici su bezbedni jer ovo nije vrednost atributa.
+    return value.replace(/&/g, "&amp;").replace(/</g, "&lt;").replace(/>/g, "&gt;");
+  }
+
+  function applyReplacements(content, imagePairs, textPairs, path) {
+    textPairs.forEach(function (pair) {
+      if (content.indexOf(pair.from) < 0) return;
+      content = content.split(pair.from).join(escapeForFile(pair.to, path));
+    });
+    return rewriteHtml(content, imagePairs);
+  }
+
+  function buildPageCommit(draft) {
+    var files = stagedFilesFor(draft);
+
+    var imagePairs = [];
+    draft.images.forEach(function (image, index) {
+      var before = state.original.images[index];
+      if (before && image.src !== before.src) {
+        imagePairs.push({ match: before.match, src: image.src });
+      }
+    });
+
+    var textPairs = [];
+    draft.texts.forEach(function (text, index) {
+      var before = state.original.texts[index];
+      if (before && text.value !== before.value) {
+        textPairs.push({ from: before.value, to: text.value });
+      }
+    });
+
+    if (!imagePairs.length && !textPairs.length) {
+      return Promise.reject(new Error("Nema izmena za snimanje."));
+    }
+
+    // Sadrzaj Home-a i About-a stoji i u HTML-u i u page chunk-u iz kog React
+    // renderuje. Promeniti samo HTML znaci da hidracija vrati staro stanje —
+    // zato se menja svaki izvor iz mape.
+    var sources = draft.sources && draft.sources.length ? draft.sources : [draft.file];
+
+    return Promise.all(
+      sources.map(function (path) {
+        return state.store.readFile(path);
+      })
+    ).then(function (contents) {
+      var textHits = {};
+
+      contents.forEach(function (content, index) {
+        if (content === null) {
+          throw new Error("Ne mogu da procitam " + sources[index] + " iz repozitorijuma.");
+        }
+        textPairs.forEach(function (pair, pairIndex) {
+          textHits[pairIndex] = (textHits[pairIndex] || 0) + content.split(pair.from).length - 1;
+        });
+      });
+
+      textPairs.forEach(function (pair, pairIndex) {
+        if (!textHits[pairIndex]) {
+          throw new Error(
+            'Stari tekst "' + pair.from.slice(0, 40) +
+              '…" nije pronadjen u stranici. Pokreni `npm run media-map` da se mapa osvezi.'
+          );
+        }
+      });
+
+      contents.forEach(function (content, index) {
+        var next = applyReplacements(content, imagePairs, textPairs, sources[index]);
+        if (next !== content) {
+          files.push({ path: sources[index], base64: b64encode(next) });
+        }
+      });
+
+      var manifest = JSON.parse(JSON.stringify(state.pagesManifest || {}));
+      var entry = manifest[draft.id] || {};
+      entry.images = draft.images.map(function (image, index) {
+        var before = state.original.images[index] || {};
+        return {
+          key: image.key,
+          label: image.label,
+          match: image.src === before.src ? before.match : image.src,
+          src: image.src,
+        };
+      });
+      entry.texts = draft.texts.map(function (text) {
+        return { key: text.key, label: text.label, value: text.value, rows: text.rows };
+      });
+      entry.sources = sources;
+      manifest[draft.id] = entry;
+      files.push({ path: CFG.pagesFile, base64: b64encode(JSON.stringify(manifest, null, 2) + "\n") });
+
+      var what = [];
+      if (imagePairs.length) what.push(imagePairs.length + " slika");
+      if (textPairs.length) what.push("tekst");
+
+      return { message: "CMS: " + draft.title + " — " + what.join(" + "), files: files };
+    });
+  }
+
   function buildCommit(draft) {
+    if (draft.kind === "page") return buildPageCommit(draft);
+
     var files = stagedFilesFor(draft);
 
     if (draft.kind === "cms") {
@@ -1687,11 +2008,25 @@
       return Promise.resolve({ message: "CMS: izmena kartice " + draft.title, files: files });
     }
 
-    var htmlPath = "work/" + draft.slug + "/index.html";
-    return state.store.readFile(htmlPath).then(function (html) {
-      if (html) {
-        files.push({ path: htmlPath, base64: b64encode(rewriteHtml(html, pairs)) });
-      }
+    // Izvori projekta iz mape (stranica + eventualni page chunk), plus Home —
+    // on prikazuje thumbove izabranih projekata, pa bi inace ostao sa starom
+    // slikom dok bi /work i sama stranica imale novu.
+    var sources = (draft.sources || ["work/" + draft.slug + "/index.html"]).slice();
+    if (sources.indexOf("index.html") < 0) sources.push("index.html");
+
+    return Promise.all(
+      sources.map(function (path) {
+        return state.store.readFile(path);
+      })
+    ).then(function (contents) {
+      contents.forEach(function (content, index) {
+        if (content === null) return;
+        var next = rewriteHtml(content, pairs);
+        if (next !== content) {
+          files.push({ path: sources[index], base64: b64encode(next) });
+        }
+      });
+
       return {
         message: "CMS: " + draft.title + " — zamena " + pairs.length + " slike/slika",
         files: files,

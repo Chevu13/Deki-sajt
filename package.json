@@ -4,7 +4,7 @@
   "type": "module",
   "scripts": {
     "build": "node scripts/build.mjs",
-    "legacy-images": "node scripts/legacy-images.mjs"
+    "media-map": "node scripts/media-map.mjs"
   },
   "dependencies": {
     "gray-matter": "^4.0.3"

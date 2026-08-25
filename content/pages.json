@@ -1,0 +1,57 @@
+{
+  "home": {
+    "label": "Home",
+    "file": "index.html",
+    "url": "/",
+    "images": [
+      {
+        "key": "hero",
+        "label": "Hero",
+        "match": "image-bf1ddb46",
+        "src": "/assets/images/opt/image-bf1ddb46-1024.webp"
+      }
+    ],
+    "texts": [
+      {
+        "key": "intro",
+        "label": "Tekst ispod hero banera",
+        "value": "Belgrade-based Creative Director specializing in startup branding, UI/UX, and visual storytelling. Since 2015, I've used the power of design to help diverse clients reach their customers and stand out in the market.",
+        "rows": 4
+      }
+    ],
+    "sources": [
+      "index.html",
+      "assets/animate/H2Yv0t8Mvk2FWLdQ6tHUhgjziTAf1vzmVSawbJ9D1Wc.Bd56cX4P.mjs"
+    ]
+  },
+  "about": {
+    "label": "About",
+    "file": "about/index.html",
+    "url": "/about",
+    "images": [
+      {
+        "key": "image1",
+        "label": "Image 1",
+        "match": "image-5c3aea18",
+        "src": "/assets/images/opt/image-5c3aea18-1024.webp"
+      },
+      {
+        "key": "image2",
+        "label": "Image 2",
+        "match": "image-cdb9cb27",
+        "src": "/assets/images/opt/image-cdb9cb27-1024.webp"
+      },
+      {
+        "key": "image3",
+        "label": "Image 3",
+        "match": "image-cede67c4",
+        "src": "/assets/images/opt/image-cede67c4-1024.webp"
+      }
+    ],
+    "texts": [],
+    "sources": [
+      "about/index.html",
+      "assets/animate/xgjk2dRf4WLFwYtqO9kqZq8h5wx6MO7DbsGs_4ef94A.KLt8BnwO.mjs"
+    ]
+  }
+}

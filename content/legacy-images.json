@@ -37,7 +37,10 @@
         "alt": "Cro Sea Villas brand identity — packaging and merchandise design"
       }
     ],
-    "video": null
+    "video": null,
+    "sources": [
+      "work/cro-sea-villas/index.html"
+    ]
   },
   "falco-gin": {
     "thumb": {
@@ -77,7 +80,10 @@
         "alt": "Falco Gin brand identity — editorial print design luxury gin booklet art direction"
       }
     ],
-    "video": null
+    "video": null,
+    "sources": [
+      "work/falco-gin/index.html"
+    ]
   },
   "adria-design-biennale": {
     "thumb": {
@@ -120,7 +126,10 @@
     "video": {
       "match": "/assets/videos/video-dea303b1.mp4",
       "src": "/assets/videos/video-dea303b1.mp4"
-    }
+    },
+    "sources": [
+      "work/adria-design-biennale/index.html"
+    ]
   },
   "pletho": {
     "thumb": {
@@ -160,7 +169,10 @@
         "alt": "Pletho visual identity — branded merchandise and packaging health technology startup"
       }
     ],
-    "video": null
+    "video": null,
+    "sources": [
+      "work/pletho/index.html"
+    ]
   },
   "nordarch-studio": {
     "thumb": {
@@ -200,7 +212,10 @@
         "alt": "Nordarch Studio brand identity — full stationery set and collateral design Nordic architecture"
       }
     ],
-    "video": null
+    "video": null,
+    "sources": [
+      "work/nordarch-studio/index.html"
+    ]
   },
   "vellor-residency": {
     "thumb": {
@@ -243,6 +258,9 @@
     "video": {
       "match": "/assets/videos/video-63db05a1.mp4",
       "src": "/assets/videos/video-63db05a1.mp4"
-    }
+    },
+    "sources": [
+      "work/vellor-residency/index.html"
+    ]
   }
 }
