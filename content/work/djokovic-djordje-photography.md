@@ -1,7 +1,7 @@
 ---
 title: Djokovic & Djordje Photography
 slug: djokovic-djordje-photography
-status: Draft
+status: Live
 year: 2023
 services:
   - Brand Identity
