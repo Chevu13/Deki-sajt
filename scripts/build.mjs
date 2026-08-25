@@ -93,11 +93,21 @@ function renderServices(services) {
   return list.filter(Boolean).map(escapeHtml).join(", ");
 }
 
+// "croseavillas.hr" otkucano bez protokola bi kao href bilo relativno i vodilo
+// na /work/<slug>/croseavillas.hr. Framer je to sam normalizovao, pa i mi.
+function normalizeUrl(url) {
+  const trimmed = String(url).trim();
+  if (!trimmed || /^(https?:)?\/\//i.test(trimmed) || trimmed.startsWith("/")) return trimmed;
+  if (/^(mailto:|tel:)/i.test(trimmed)) return trimmed;
+  return `https://${trimmed}`;
+}
+
 function renderLiveLinkBlock(liveLink) {
   if (!liveLink) return "";
+  const href = normalizeUrl(liveLink);
   return `    <div>
       <p class="cms-meta__label">Live Link</p>
-      <p class="cms-meta__value"><a href="${escapeHtml(liveLink)}" target="_blank" rel="noopener noreferrer">${escapeHtml(liveLink)}</a></p>
+      <p class="cms-meta__value"><a href="${escapeHtml(href)}" target="_blank" rel="noopener noreferrer">${escapeHtml(liveLink)}</a></p>
     </div>
 `;
 }
@@ -105,11 +115,15 @@ function renderLiveLinkBlock(liveLink) {
 // {{CANONICAL}} feeds <link rel="canonical">, og:url and the JSON-LD block in
 // templates/_head.html. canonicalPath is the clean, root-absolute path of the
 // generated page ("/work", "/work/<slug>") — matches vercel.json cleanUrls.
-function renderHead(headPartial, title, description, canonicalPath) {
+function renderHead(headPartial, title, description, canonicalPath, noindex) {
   return headPartial
     .replace(/\{\{TITLE\}\}/g, escapeHtml(title))
     .replace(/\{\{DESCRIPTION\}\}/g, escapeHtml(description || ""))
-    .replace(/\{\{CANONICAL\}\}/g, escapeHtml(SITE_URL + canonicalPath));
+    .replace(/\{\{CANONICAL\}\}/g, escapeHtml(SITE_URL + canonicalPath))
+    .replace(
+      /\{\{ROBOTS\}\}/g,
+      noindex ? '<meta name="robots" content="noindex, nofollow">' : ""
+    );
 }
 
 function buildWorkItemPage(project, partials) {
@@ -117,7 +131,8 @@ function buildWorkItemPage(project, partials) {
     partials.head,
     `${project.title} — Dejan Tumenko`,
     project.overview,
-    `/work/${project.slug}`
+    `/work/${project.slug}`,
+    project.noindex
   );
 
   return partials.workItemTemplate
@@ -194,11 +209,15 @@ function buildSitemap(allProjects) {
 
   const entries = [
     ...STATIC_PAGES,
-    ...allProjects.map((p) => ({
-      loc: `/work/${p.slug}`,
-      changefreq: "yearly",
-      priority: "0.7",
-    })),
+    // `noindex: true` u frontmatteru drzi stranicu van sitemap-a i dodaje joj
+    // meta robots noindex — za privremene/probne stranice na zivom sajtu.
+    ...allProjects
+      .filter((p) => !p.noindex)
+      .map((p) => ({
+        loc: `/work/${p.slug}`,
+        changefreq: "yearly",
+        priority: "0.7",
+      })),
   ].map((entry) => {
     // The home page is the only URL published with a trailing slash.
     const loc = SITE_URL + (entry.loc === "/" ? "/" : entry.loc);
@@ -253,8 +272,9 @@ function main() {
   fs.writeFileSync(WORK_LIST_FILE, buildWorkListPage(allProjects, partials), "utf8");
   console.log(`built  work/index.html (${legacyProjects.length} legacy + ${cmsProjects.length} CMS project(s))`);
 
-  fs.writeFileSync(SITEMAP_FILE, buildSitemap(allProjects), "utf8");
-  console.log(`built  sitemap.xml (${STATIC_PAGES.length + allProjects.length} URLs)`);
+  const sitemap = buildSitemap(allProjects);
+  fs.writeFileSync(SITEMAP_FILE, sitemap, "utf8");
+  console.log(`built  sitemap.xml (${(sitemap.match(/<loc>/g) || []).length} URLs)`);
 
   console.log(`\nDone.`);
 }
