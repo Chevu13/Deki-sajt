@@ -61,7 +61,16 @@ const server = http.createServer((req, res) => {
 
   fs.stat(filePath, (err, stat) => {
     if (err || !stat.isFile()) {
-      res.writeHead(404).end("Not found");
+      // try clean-URL fallback: /work -> /work/index.html
+      const asDir = path.join(ROOT, pathname, "index.html");
+      fs.stat(asDir, (err2, stat2) => {
+        if (err2 || !stat2.isFile()) {
+          res.writeHead(404).end("Not found");
+          return;
+        }
+        res.setHeader("Content-Type", "text/html");
+        fs.createReadStream(asDir).pipe(res);
+      });
       return;
     }
     const ext = path.extname(filePath);

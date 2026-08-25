@@ -2,3 +2,4 @@ User-agent: *
 Allow: /
 Sitemap: https://www.dtumenko.com/sitemap.xml
 Disallow: /admin-preview/
+Disallow: /admin

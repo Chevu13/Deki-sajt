@@ -25,6 +25,12 @@
     <priority>0.6</priority>
   </url>
   <url>
+    <loc>https://www.dtumenko.com/privacy-policy</loc>
+    <lastmod>2026-08-20</lastmod>
+    <changefreq>yearly</changefreq>
+    <priority>0.2</priority>
+  </url>
+  <url>
     <loc>https://www.dtumenko.com/work/cro-sea-villas</loc>
     <lastmod>2026-08-20</lastmod>
     <changefreq>yearly</changefreq>
@@ -59,11 +65,5 @@
     <lastmod>2026-08-20</lastmod>
     <changefreq>yearly</changefreq>
     <priority>0.7</priority>
-  </url>
-  <url>
-    <loc>https://www.dtumenko.com/privacy-policy</loc>
-    <lastmod>2026-08-20</lastmod>
-    <changefreq>yearly</changefreq>
-    <priority>0.2</priority>
   </url>
 </urlset>

@@ -22,6 +22,8 @@ const ROOT = path.resolve(import.meta.dirname, "..");
 const CONTENT_DIR = path.join(ROOT, "content/work");
 const LEGACY_FILE = path.join(ROOT, "content/legacy-work.json");
 const WORK_LIST_FILE = path.join(ROOT, "work/index.html");
+const SITEMAP_FILE = path.join(ROOT, "sitemap.xml");
+const SITE_URL = "https://www.dtumenko.com";
 
 function readIfExists(file) {
   return fs.existsSync(file) ? fs.readFileSync(file, "utf8") : "";
@@ -100,14 +102,23 @@ function renderLiveLinkBlock(liveLink) {
 `;
 }
 
-function renderHead(headPartial, title, description) {
+// {{CANONICAL}} feeds <link rel="canonical">, og:url and the JSON-LD block in
+// templates/_head.html. canonicalPath is the clean, root-absolute path of the
+// generated page ("/work", "/work/<slug>") — matches vercel.json cleanUrls.
+function renderHead(headPartial, title, description, canonicalPath) {
   return headPartial
     .replace(/\{\{TITLE\}\}/g, escapeHtml(title))
-    .replace(/\{\{DESCRIPTION\}\}/g, escapeHtml(description || ""));
+    .replace(/\{\{DESCRIPTION\}\}/g, escapeHtml(description || ""))
+    .replace(/\{\{CANONICAL\}\}/g, escapeHtml(SITE_URL + canonicalPath));
 }
 
 function buildWorkItemPage(project, partials) {
-  const head = renderHead(partials.head, `${project.title} — Tumenko Portfolio`, project.overview);
+  const head = renderHead(
+    partials.head,
+    `${project.title} — Dejan Tumenko`,
+    project.overview,
+    `/work/${project.slug}`
+  );
 
   return partials.workItemTemplate
     .replace("<!--CMS_HEAD-->", head)
@@ -139,8 +150,9 @@ function buildCardGrid(projects) {
 function buildWorkListPage(allProjects, partials) {
   const head = renderHead(
     partials.head,
-    "Works — Tumenko Portfolio",
-    "Selected branding, art direction, and visual identity projects."
+    "Works — Dejan Tumenko, Creative Director",
+    "Selected branding, art direction, and visual identity projects by Dejan Tumenko, Belgrade-based Creative Director.",
+    "/work"
   );
   const nav = toDepth1(partials.nav);
   const footer = toDepth1(partials.footer);
@@ -150,6 +162,65 @@ function buildWorkListPage(allProjects, partials) {
     .replace("<!--CMS_NAV-->", nav)
     .replace("<!--CMS_FOOTER-->", footer)
     .replace("{{CARD_GRID}}", buildCardGrid(allProjects));
+}
+
+// Static pages are hand-authored Framer exports this script never touches, so
+// their sitemap entries are declared here; project pages are appended from the
+// same data that generates them, which is the whole point — a project added in
+// /admin lands in the sitemap on the next Vercel build instead of being
+// invisible to crawlers until someone remembers to edit sitemap.xml by hand.
+const STATIC_PAGES = [
+  { loc: "/", changefreq: "monthly", priority: "1.0" },
+  { loc: "/work", changefreq: "monthly", priority: "0.9" },
+  { loc: "/about", changefreq: "monthly", priority: "0.8" },
+  { loc: "/contact", changefreq: "yearly", priority: "0.6" },
+  { loc: "/privacy-policy", changefreq: "yearly", priority: "0.2" },
+];
+
+// Reuse the lastmod already published for a URL so untouched pages don't get a
+// fresh date on every deploy — only genuinely new URLs get today's.
+function existingLastmods() {
+  const xml = readIfExists(SITEMAP_FILE);
+  const map = new Map();
+  const re = /<loc>([^<]+)<\/loc>\s*<lastmod>([^<]+)<\/lastmod>/g;
+  let match;
+  while ((match = re.exec(xml))) map.set(match[1], match[2]);
+  return map;
+}
+
+function buildSitemap(allProjects) {
+  const known = existingLastmods();
+  const today = new Date().toISOString().slice(0, 10);
+
+  const entries = [
+    ...STATIC_PAGES,
+    ...allProjects.map((p) => ({
+      loc: `/work/${p.slug}`,
+      changefreq: "yearly",
+      priority: "0.7",
+    })),
+  ].map((entry) => {
+    // The home page is the only URL published with a trailing slash.
+    const loc = SITE_URL + (entry.loc === "/" ? "/" : entry.loc);
+    return { ...entry, loc, lastmod: known.get(loc) || today };
+  });
+
+  const body = entries
+    .map(
+      (e) => `  <url>
+    <loc>${escapeHtml(e.loc)}</loc>
+    <lastmod>${e.lastmod}</lastmod>
+    <changefreq>${e.changefreq}</changefreq>
+    <priority>${e.priority}</priority>
+  </url>`
+    )
+    .join("\n");
+
+  return `<?xml version="1.0" encoding="UTF-8"?>
+<urlset xmlns="http://www.sitemaps.org/schemas/sitemap/0.9">
+${body}
+</urlset>
+`;
 }
 
 function main() {
@@ -181,6 +252,9 @@ function main() {
 
   fs.writeFileSync(WORK_LIST_FILE, buildWorkListPage(allProjects, partials), "utf8");
   console.log(`built  work/index.html (${legacyProjects.length} legacy + ${cmsProjects.length} CMS project(s))`);
+
+  fs.writeFileSync(SITEMAP_FILE, buildSitemap(allProjects), "utf8");
+  console.log(`built  sitemap.xml (${STATIC_PAGES.length + allProjects.length} URLs)`);
 
   console.log(`\nDone.`);
 }
