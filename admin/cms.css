@@ -786,6 +786,19 @@ a {
   color: var(--accent);
 }
 
+.slot-remove {
+  align-self: center;
+  padding: 6px 10px;
+  border-radius: var(--radius-sm);
+  color: var(--text-mute);
+  font-size: 12px;
+}
+
+.slot-remove:hover {
+  background: var(--field);
+  color: var(--danger);
+}
+
 /* video slot bez fajla — Framer ga prikazuje kao "Choose File..." polje */
 .filepick {
   width: 100%;

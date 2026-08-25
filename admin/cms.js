@@ -24,7 +24,12 @@
   var CFG = window.CMS_CONFIG || {};
   var DEMO = !!CFG.demo;
   var TOKEN_KEY = "tumenko-cms-token";
-  var IMAGE_SLOTS = 6;
+  // Broj slika u 6 originalnih Framer stranica. Nije nasa odluka — Framer
+  // komponenta tih stranica ima tacno sedam imenovanih polja za sliku (hero +
+  // sest u galeriji), pa se sedma ne moze dodati bez izmene u samom Frameru.
+  // Novi CMS projekti nemaju to ogranicenje: njihova galerija je niz.
+  var LEGACY_IMAGE_SLOTS = 6;
+  var NEW_PROJECT_SLOTS = 3;
 
   /* ------------------------------------------------------------ helpers */
 
@@ -359,20 +364,19 @@
     var services = Array.isArray(data.services) ? data.services : data.services ? [data.services] : [];
     var gallery = Array.isArray(data.gallery) ? data.gallery : [];
 
-    var images = emptySlots(IMAGE_SLOTS);
+    // Galerija CMS projekta je obican niz — koliko slika ima, toliko slotova.
+    // Nema gornje granice; jedan projekat moze da ima tri, drugi deset.
+    var images = [];
     var video = { src: "", match: "" };
-    var slot = 0;
     gallery.forEach(function (row) {
       if (!row || !row.src) return;
       if (row.type === "video" || isVideoPath(row.src)) {
         if (!video.src) video = { src: row.src, match: row.src };
         return;
       }
-      if (slot < IMAGE_SLOTS) {
-        images[slot] = { src: row.src, alt: row.alt || "", match: row.src };
-        slot++;
-      }
+      images.push({ src: row.src, alt: row.alt || "", match: row.src });
     });
+    if (!images.length) images = emptySlots(1);
 
     return {
       key: "cms:" + file,
@@ -421,11 +425,11 @@
   }
 
   function fromLegacy(row, manifest) {
-    var slots = manifest && manifest.images ? manifest.images.slice(0, IMAGE_SLOTS) : [];
+    var slots = manifest && manifest.images ? manifest.images.slice(0, LEGACY_IMAGE_SLOTS) : [];
     var images = slots.map(function (slot) {
       return { src: slot.src, alt: slot.alt || "", match: slot.match };
     });
-    while (images.length < IMAGE_SLOTS) images.push({ src: "", alt: "", match: "" });
+    while (images.length < LEGACY_IMAGE_SLOTS) images.push({ src: "", alt: "", match: "" });
 
     var thumb = (manifest && manifest.thumb) || { src: row.hero_image || "", match: "" };
 
@@ -508,7 +512,7 @@
       liveLink: "",
       services: ["", "", ""],
       thumb: { src: "", alt: "", match: "" },
-      images: emptySlots(IMAGE_SLOTS),
+      images: emptySlots(NEW_PROJECT_SLOTS),
       video: { src: "", match: "" },
     };
   }
@@ -1529,8 +1533,47 @@
     );
 
     draft.images.forEach(function (image, index) {
-      fields.push(fieldRow("Image " + (index + 1), mediaSlot(image, "image")));
+      fields.push(
+        fieldRow(
+          "Image " + (index + 1),
+          mediaSlot(
+            image,
+            "image",
+            // Kod CMS projekata × sklanja ceo slot, jer je galerija niz. Kod
+            // originalnih 6 slotova ima tacno sest i × samo prazni sliku.
+            isLegacy
+              ? null
+              : function () {
+                  draft.images.splice(index, 1);
+                  if (!draft.images.length) draft.images.push({ src: "", alt: "", match: "" });
+                  markDirty();
+                  rerenderEditor();
+                }
+          )
+        )
+      );
     });
+
+    if (!isLegacy) {
+      fields.push(
+        fieldRow(
+          "",
+          el(
+            "button",
+            {
+              class: "btn",
+              onclick: function () {
+                draft.images.push({ src: "", alt: "", match: "" });
+                markDirty();
+                rerenderEditor();
+              },
+            },
+            [el("span", { html: ICONS.plus }), el("span", { text: "Dodaj sliku" })]
+          ),
+          "Galerija moze da ima koliko god slika treba — tri, deset, svejedno."
+        )
+      );
+    }
 
     fields.push(fieldRow("video", mediaSlot(draft.video, "video")));
 
@@ -1542,7 +1585,10 @@
             class: "field__hint",
             text:
               "Ovo je originalna Framer stranica. Slike i tekst kartice se menjaju " +
-              "odavde; raspored i animacije same stranice dolaze iz Framer export-a.",
+              "odavde; raspored i animacije same stranice dolaze iz Framer export-a. " +
+              "Broj slika je fiksan na sest jer Framer komponenta te stranice ima " +
+              "tacno toliko polja — sedma se dodaje samo u Frameru, pa novim exportom. " +
+              "Novi projekti nemaju to ogranicenje.",
           })
         )
       );
@@ -1607,8 +1653,9 @@
     return el("div", { class: "section" }, [el("span", { text: label })]);
   }
 
-  // slot je { src, alt, match } — menja se u mestu da bi draft ostao jedan objekat.
-  function mediaSlot(slot, kind) {
+  // slot je { src, alt, match } — menja se u mestu da bi draft ostao jedan
+  // objekat. Ako je dat onRemove, × sklanja ceo slot; inace samo prazni sliku.
+  function mediaSlot(slot, kind, onRemove) {
     var accept = kind === "video" ? "video/mp4,video/webm" : "image/*";
 
     if (!slot.src) {
@@ -1625,6 +1672,11 @@
           },
           [kind === "video" ? "Choose File..." : "Upload"]
         ),
+        onRemove
+          ? el("button", { class: "slot-remove", title: "Ukloni ovaj slot", onclick: onRemove }, [
+              "Ukloni",
+            ])
+          : null,
       ]);
     }
 
@@ -1638,12 +1690,14 @@
           "button",
           {
             class: "thumb__remove",
-            title: "Ukloni",
-            onclick: function () {
-              slot.src = "";
-              markDirty();
-              rerenderEditor();
-            },
+            title: onRemove ? "Ukloni sliku iz galerije" : "Ukloni sliku",
+            onclick:
+              onRemove ||
+              function () {
+                slot.src = "";
+                markDirty();
+                rerenderEditor();
+              },
           },
           ["×"]
         ),
