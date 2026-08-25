@@ -36,38 +36,43 @@
     }
   }
 
-  // Kontejner galerije se ne trazi po Framer klasi — one se menjaju sa svakim
-  // exportom. Trazi se najdublji element koji sadrzi sve poznate slike
-  // galerije, sto ostaje tacno i posle novog exporta.
-  function findTrack(known) {
-    if (!known.length) return null;
+  // Framer renderuje istu galeriju u vise varijanti (desktop i mobilna), a
+  // koja se vidi zavisi od sirine ekrana — obe stoje u DOM-u. Zato se dopunjuju
+  // SVE, ne prva pronadjena: inace se dodate slike zateknu u varijanti koja se
+  // kod posetioca ne prikazuje.
+  //
+  // Kontejner se ne trazi po Framer klasi — one se menjaju sa svakim exportom —
+  // nego kao predak koji drzi i prvu i poslednju poznatu sliku galerije.
+  function findTracks(known) {
+    if (known.length < 2) return [];
 
-    var nodes = known
-      .map(function (match) {
-        var img = document.querySelector('img[src*="' + match + '"]');
-        return img;
-      })
-      .filter(Boolean);
+    var first = known[0];
+    var last = known[known.length - 1];
+    var tracks = [];
 
-    if (nodes.length < 2) return null;
+    Array.prototype.forEach.call(
+      document.querySelectorAll('img[src*="' + first + '"]'),
+      function (img) {
+        var node = img.parentElement;
+        while (node && node !== document.body) {
+          if (node.querySelector('img[src*="' + last + '"]')) break;
+          node = node.parentElement;
+        }
+        if (!node || node === document.body) return;
 
-    var candidate = nodes[0].parentElement;
-    while (candidate && candidate !== document.body) {
-      var holdsAll = nodes.every(function (node) {
-        return candidate.contains(node);
-      });
-      if (holdsAll) break;
-      candidate = candidate.parentElement;
-    }
-    if (!candidate || candidate === document.body) return null;
+        // Slajd je ono dete kontejnera koje sadrzi ovu sliku.
+        var slide = img;
+        while (slide && slide.parentElement !== node) slide = slide.parentElement;
+        if (!slide) return;
 
-    // Slajd je ono dete kontejnera koje sadrzi poslednju poznatu sliku.
-    var last = nodes[nodes.length - 1];
-    var slide = last;
-    while (slide && slide.parentElement !== candidate) slide = slide.parentElement;
-    if (!slide) return null;
+        var seen = tracks.some(function (entry) {
+          return entry.track === node;
+        });
+        if (!seen) tracks.push({ track: node, slide: slide });
+      }
+    );
 
-    return { track: candidate, slide: slide };
+    return tracks;
   }
 
   function buildSlide(template, image, index) {
@@ -100,13 +105,20 @@
   }
 
   function apply(config) {
-    var found = findTrack(config.known);
-    if (!found) return false;
+    var tracks = findTracks(config.known);
+    if (!tracks.length) return false;
 
+    tracks.forEach(function (found) {
+      fill(config, found);
+    });
+    return true;
+  }
+
+  function fill(config, found) {
     // Provera je broj slajdova, ne "postoji li ijedan": ako React prezida
     // listu i pojede deo dodatih, ostatak se skida i ubacuju se svi ponovo.
     var existing = found.track.querySelectorAll("[" + MARK + "]");
-    if (existing.length === config.images.length) return true;
+    if (existing.length === config.images.length) return;
     Array.prototype.forEach.call(existing, function (node) {
       node.remove();
     });
@@ -135,33 +147,38 @@
         if (observer) observer.unobserve(node);
       }, 1500);
     });
-
-    return true;
   }
 
   function start() {
     var config = readConfig();
     if (!config) return;
 
-    // Hidracija nije trenutna, a React usput zameni ceo podrazumevani markup.
-    // Pokusava se dok galerija ne bude u DOM-u, pa se onda jos prati da li je
-    // React prezidao listu (npr. kad se promeni breakpoint) i vraca se dodato.
+    // Hidracija nije trenutna, a React usput zameni podrazumevani markup i
+    // varijante galerije ne moraju da se pojave istovremeno. Zato se pokusava
+    // punih 10 sekundi i ne prekida na prvom uspehu — druga varijanta zna da
+    // stigne kasnije. Kad se broj slajdova poklopi, apply nista ne radi.
     var tries = 0;
     var timer = setInterval(function () {
-      tries++;
-      if (apply(config) || tries > 40) clearInterval(timer);
+      apply(config);
+      if (++tries > 40) clearInterval(timer);
     }, 250);
 
     var pending = false;
-    var watcher = new MutationObserver(function () {
+    function schedule() {
       if (pending) return;
       pending = true;
       setTimeout(function () {
         pending = false;
         apply(config);
       }, 200);
+    }
+
+    // Prezidavanje liste (npr. promena breakpointa) vraca dodate slajdove.
+    new MutationObserver(schedule).observe(document.body, {
+      childList: true,
+      subtree: true,
     });
-    watcher.observe(document.body, { childList: true, subtree: true });
+    window.addEventListener("resize", schedule);
   }
 
   if (document.readyState === "loading") {
