@@ -74,7 +74,7 @@ Panel ima dve kolekcije u sidebaru:
 | Kolekcija | Stavke | Izvor | Šta se menja |
 |---|---|---|---|
 | **Work Items** | CMS projekti | `content/work/*.md` | sve; `scripts/build.mjs` iz njih generiše `work/<slug>/index.html` |
-| **Work Items** | Framer projekti (originalnih 6) | `content/legacy-work.json` + sam HTML | kartica na `/work`, **Project Overview**, sve slike i video u stranici **+ dodatne preko šest**, Status, brisanje |
+| **Work Items** | Framer projekti (originalnih 6) | `content/legacy-work.json` + sam HTML | kartica na `/work`, **Project Overview, Service 1–3, Live Link**, sve slike i video **+ dodatne preko šest**, Status, brisanje |
 | **Pages** | Home, About | `content/pages.json` + sam HTML | Home: hero slika i tekst ispod hero banera. About: tri slike u sekciji |
 
 ### Kako se menja sadržaj statičkih Framer stranica
@@ -86,7 +86,7 @@ sadržaj tako što prepiše same izvorne fajlove, isto što radi i
 Mape "šta stoji gde" pravi `npm run media-map`:
 
 ```
-content/legacy-images.json   6 project stranica: Project Overview, Thumb,
+content/legacy-images.json   6 project stranica: tekstualna polja, Thumb,
                              Image 1–6 (+ dodatne), video
 content/pages.json           Home i About: slike + tekst
 ```
@@ -114,6 +114,13 @@ svoj HTML; Home i About imaju i po jedan `.mjs` chunk.
 
 Kad se zameni Thumb nekog od 6 projekata, prepisuje se i `index.html` — naslovna
 prikazuje thumbove izabranih radova, pa bi inače ostala sa starom slikom.
+
+**Tekstualna polja originalnih 6** (Project Overview, Service 1–3, Live Link) se
+u payloadu menjaju **po indeksu polja, ne pretragom teksta**. Vrednosti kao
+`Brand Identity` javljaju se na stranici i van tog polja, pa bi slepa zamena
+pogodila i ono što ne treba. Panel pročita payload kao JSON, izmeni tačno taj
+indeks i serijalizuje nazad; u telu stranice menja samo ceo tekstualni čvor
+(`>vrednost<`) i celu vrednost atributa.
 
 ### Dodatne slike u galerijama originalnih 6
 

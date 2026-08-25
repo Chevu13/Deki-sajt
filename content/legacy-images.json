@@ -54,6 +54,43 @@
         "src": "/assets/uploads/mt8m37lo-print-design.jpg",
         "alt": ""
       }
+    ],
+    "texts": [
+      {
+        "key": "project_overview",
+        "field": "qHx5bRsBk",
+        "label": "Project Overview",
+        "rows": 6,
+        "value": "This art direction project distills the spirit of a premier Adriatic villa retreat into a complete visual identity. Crisp whites, deep navies, and Mediterranean light guide every design decision — from branded amenities to social presence. The result is a refined, consistent brand world that speaks directly to the luxury traveler seeking privacy, elegance, and the magic of the Croatian coast."
+      },
+      {
+        "key": "service1",
+        "field": "ES3pqjhrn",
+        "label": "Service 1",
+        "rows": 1,
+        "value": "Art Direction"
+      },
+      {
+        "key": "service2",
+        "field": "rc8P13D3Q",
+        "label": "Service 2",
+        "rows": 1,
+        "value": "Brand Identity"
+      },
+      {
+        "key": "service3",
+        "field": "vdUCargUV",
+        "label": "Service 3",
+        "rows": 1,
+        "value": "Digital Marketing"
+      },
+      {
+        "key": "live_link",
+        "field": "E3vtRy1Vd",
+        "label": "Live Link",
+        "rows": 1,
+        "value": "https://croseavillas.hr/"
+      }
     ]
   },
   "falco-gin": {
@@ -98,7 +135,44 @@
     "sources": [
       "work/falco-gin/index.html"
     ],
-    "extra": []
+    "extra": [],
+    "texts": [
+      {
+        "key": "project_overview",
+        "field": "qHx5bRsBk",
+        "label": "Project Overview",
+        "rows": 6,
+        "value": "Falco Gin is a handcrafted Swiss premium spirit defined by character, precision, and a bold sensory identity. Distilled in small batches and refined with a unique blend of botanicals and exotic fruits, the brand balances tradition with a contemporary edge. This project focused on translating that identity into a tactile, editorial experience. Through art direction and booklet design, the goal was to create a visual narrative that reflects the essence of Falco — raw, refined, and unapologetically expressive."
+      },
+      {
+        "key": "service1",
+        "field": "ES3pqjhrn",
+        "label": "Service 1",
+        "rows": 1,
+        "value": "Editorial Design"
+      },
+      {
+        "key": "service2",
+        "field": "rc8P13D3Q",
+        "label": "Service 2",
+        "rows": 1,
+        "value": "Print Design"
+      },
+      {
+        "key": "service3",
+        "field": "vdUCargUV",
+        "label": "Service 3",
+        "rows": 1,
+        "value": "Art Direction"
+      },
+      {
+        "key": "live_link",
+        "field": "E3vtRy1Vd",
+        "label": "Live Link",
+        "rows": 1,
+        "value": "https://www.falcogin.com/"
+      }
+    ]
   },
   "adria-design-biennale": {
     "thumb": {
@@ -145,7 +219,44 @@
     "sources": [
       "work/adria-design-biennale/index.html"
     ],
-    "extra": []
+    "extra": [],
+    "texts": [
+      {
+        "key": "project_overview",
+        "field": "qHx5bRsBk",
+        "label": "Project Overview",
+        "rows": 6,
+        "value": "The project explores how a contemporary design festival can exist as a complete design ecosystem—spanning posters, environmental graphics, wayfinding, tickets, banners, motion design, and digital experience. Inspired by international biennales and large-scale cultural events, the goal was to create a bold, flexible, and recognizable identity that moves seamlessly across physical and digital spaces."
+      },
+      {
+        "key": "service1",
+        "field": "ES3pqjhrn",
+        "label": "Service 1",
+        "rows": 1,
+        "value": "Brand Identity"
+      },
+      {
+        "key": "service2",
+        "field": "rc8P13D3Q",
+        "label": "Service 2",
+        "rows": 1,
+        "value": "Print Design"
+      },
+      {
+        "key": "service3",
+        "field": "vdUCargUV",
+        "label": "Service 3",
+        "rows": 1,
+        "value": "Digital Marketing"
+      },
+      {
+        "key": "live_link",
+        "field": "E3vtRy1Vd",
+        "label": "Live Link",
+        "rows": 1,
+        "value": "framer.com"
+      }
+    ]
   },
   "pletho": {
     "thumb": {
@@ -189,7 +300,44 @@
     "sources": [
       "work/pletho/index.html"
     ],
-    "extra": []
+    "extra": [],
+    "texts": [
+      {
+        "key": "project_overview",
+        "field": "qHx5bRsBk",
+        "label": "Project Overview",
+        "rows": 6,
+        "value": "The brand was created from the ground up to position Pletho as a forward-thinking, human-centered technology company. Rather than emphasizing limitation, the identity communicates empowerment, precision, and calm support through design."
+      },
+      {
+        "key": "service1",
+        "field": "ES3pqjhrn",
+        "label": "Service 1",
+        "rows": 1,
+        "value": "Creative Direction"
+      },
+      {
+        "key": "service2",
+        "field": "rc8P13D3Q",
+        "label": "Service 2",
+        "rows": 1,
+        "value": "Product Marketing"
+      },
+      {
+        "key": "service3",
+        "field": "vdUCargUV",
+        "label": "Service 3",
+        "rows": 1,
+        "value": "Brand Identity"
+      },
+      {
+        "key": "live_link",
+        "field": "E3vtRy1Vd",
+        "label": "Live Link",
+        "rows": 1,
+        "value": "https://www.pletho.life/"
+      }
+    ]
   },
   "nordarch-studio": {
     "thumb": {
@@ -233,7 +381,44 @@
     "sources": [
       "work/nordarch-studio/index.html"
     ],
-    "extra": []
+    "extra": [],
+    "texts": [
+      {
+        "key": "project_overview",
+        "field": "qHx5bRsBk",
+        "label": "Project Overview",
+        "rows": 6,
+        "value": "Nordarch Studio is a Belgrade-based architecture firm with a Nordic design philosophy — where structure meets restraint. The brief called for a visual identity that communicates authority, precision, and timelessness. The resulting brand system draws from raw textures, muted tones, and tight typographic hierarchy — reflecting the studio's approach to space and form. Every touchpoint, from business cards to digital presence, was crafted to feel intentional and enduring. The identity positions Nordarch as a studio that doesn't follow trends — it defines them."
+      },
+      {
+        "key": "service1",
+        "field": "ES3pqjhrn",
+        "label": "Service 1",
+        "rows": 1,
+        "value": "Art Direction"
+      },
+      {
+        "key": "service2",
+        "field": "rc8P13D3Q",
+        "label": "Service 2",
+        "rows": 1,
+        "value": "Brand Identity"
+      },
+      {
+        "key": "service3",
+        "field": "vdUCargUV",
+        "label": "Service 3",
+        "rows": 1,
+        "value": "Creative Direction"
+      },
+      {
+        "key": "live_link",
+        "field": "E3vtRy1Vd",
+        "label": "Live Link",
+        "rows": 1,
+        "value": "framer.com"
+      }
+    ]
   },
   "vellor-residency": {
     "thumb": {
@@ -280,6 +465,43 @@
     "sources": [
       "work/vellor-residency/index.html"
     ],
-    "extra": []
+    "extra": [],
+    "texts": [
+      {
+        "key": "project_overview",
+        "field": "qHx5bRsBk",
+        "label": "Project Overview",
+        "rows": 6,
+        "value": "Vellor Residency is a contemporary residential development designed for modern urban living — a gated complex offering luxury apartments, private amenities, and rooftop penthouses, set for completion in 2028. The brief called for a brand identity that communicates architectural clarity, long-term value, and structural reliability — appealing equally to future residents and investors. The resulting visual system draws from a restrained palette of Gunmetal, Cadet Grey, and Light Blue, paired with Proxima Nova to balance authority with approachability. From construction signage and outdoor advertising to sales materials and digital presence, every touchpoint was crafted to position Vellor as more than a place to live — as a statement of intent."
+      },
+      {
+        "key": "service1",
+        "field": "ES3pqjhrn",
+        "label": "Service 1",
+        "rows": 1,
+        "value": "Brand Identity"
+      },
+      {
+        "key": "service2",
+        "field": "rc8P13D3Q",
+        "label": "Service 2",
+        "rows": 1,
+        "value": "Digital Marketing"
+      },
+      {
+        "key": "service3",
+        "field": "vdUCargUV",
+        "label": "Service 3",
+        "rows": 1,
+        "value": "Art Direction"
+      },
+      {
+        "key": "live_link",
+        "field": "E3vtRy1Vd",
+        "label": "Live Link",
+        "rows": 1,
+        "value": "framer.com"
+      }
+    ]
   }
 }

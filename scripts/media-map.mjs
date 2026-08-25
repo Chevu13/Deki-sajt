@@ -143,34 +143,56 @@ function ensureExtraHooks(file, known) {
   return existing;
 }
 
-// Duzi case-study tekst ("OVERVIEW" na stranici projekta) je polje qHx5bRsBk u
-// Framer CMS kolekciji. Cita se iz __framer__handoverData umesto pogadjanjem
-// "najduzeg teksta", jer na stranici ima i drugih dugackih pasusa.
-const PROJECT_OVERVIEW_FIELD = "qHx5bRsBk";
+// Tekstualna polja stranice projekta stoje u Framer CMS kolekciji, a njihove
+// vrednosti u __framer__handoverData. Citaju se odatle po id-u polja, ne
+// pogadjanjem po sadrzaju — "Brand Identity" se na stranici javlja i na mestima
+// koja nemaju veze sa ovim poljem.
+const TEXT_FIELDS = [
+  { key: "project_overview", field: "qHx5bRsBk", label: "Project Overview", rows: 6 },
+  { key: "service1", field: "ES3pqjhrn", label: "Service 1", rows: 1 },
+  { key: "service2", field: "rc8P13D3Q", label: "Service 2", rows: 1 },
+  { key: "service3", field: "vdUCargUV", label: "Service 3", rows: 1 },
+  { key: "live_link", field: "E3vtRy1Vd", label: "Live Link", rows: 1 },
+];
 
-function projectOverview(html) {
-  const script = /<script\b[^>]*id="__framer__handoverData"[^>]*>([\s\S]*?)<\/script>/i.exec(html);
+const HANDOVER = /<script\b[^>]*id="__framer__handoverData"[^>]*>([\s\S]*?)<\/script>/i;
+
+function handoverTable(html) {
+  const script = HANDOVER.exec(html);
   if (!script) return null;
-
-  let table;
   try {
-    table = JSON.parse(script[1]);
+    return JSON.parse(script[1]);
   } catch (err) {
     return null;
   }
+}
+
+// Vrednost polja je indeks u istu tabelu, a tamo cesto stoji omotac
+// {type, value} ciji je `value` opet indeks — tek on nosi sam tekst.
+function fieldValue(table, record, field) {
+  if (!(field in record)) return null;
+  let value = table[record[field]];
+  if (value && typeof value === "object" && "value" in value) value = table[value.value];
+  return typeof value === "string" && value.trim() ? value : null;
+}
+
+function textFields(html) {
+  const table = handoverTable(html);
+  if (!table) return [];
 
   const record = table.find(
     (entry) =>
-      entry && typeof entry === "object" && !Array.isArray(entry) && PROJECT_OVERVIEW_FIELD in entry
+      entry &&
+      typeof entry === "object" &&
+      !Array.isArray(entry) &&
+      TEXT_FIELDS.some((f) => f.field in entry)
   );
-  if (!record) return null;
+  if (!record) return [];
 
-  // Vrednost polja je indeks u istu tabelu, a tamo stoji omotac {type, value}
-  // ciji je `value` opet indeks — tek on nosi sam tekst.
-  let value = table[record[PROJECT_OVERVIEW_FIELD]];
-  if (value && typeof value === "object" && "value" in value) value = table[value.value];
-
-  return typeof value === "string" && value.trim() ? value : null;
+  return TEXT_FIELDS.map((spec) => {
+    const value = fieldValue(table, record, spec.field);
+    return value ? { ...spec, value } : null;
+  }).filter(Boolean);
 }
 
 function buildLegacy() {
@@ -207,11 +229,11 @@ function buildLegacy() {
     const extras = ensureExtraHooks(`work/${project.slug}/index.html`, known);
     manifest[project.slug].extra = extras;
 
-    const overview = projectOverview(html);
-    manifest[project.slug].texts = overview
-      ? [{ key: "project_overview", label: "Project Overview", value: overview, rows: 6 }]
-      : [];
-    if (!overview) console.warn(`  upozorenje: ${project.slug} — nema Project Overview u payloadu`);
+    const fields = textFields(html);
+    manifest[project.slug].texts = fields;
+    if (!fields.length) {
+      console.warn(`  upozorenje: ${project.slug} — nijedno tekstualno polje nije nadjeno`);
+    }
 
     console.log(
       `${project.slug}: thumb + ${Math.min(gallery.length, GALLERY_SLOTS)} slika` +

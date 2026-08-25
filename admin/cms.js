@@ -162,9 +162,12 @@
     };
     if (opts.body) headers["Content-Type"] = "application/json";
 
+    // Bez no-store browser servira kesiran odgovor GitHub API-ja, pa se posle
+    // Publish-a projekat otvori sa starim slikama dok se panel ne osvezi.
     return fetch("https://api.github.com" + url, {
       method: opts.method || "GET",
       headers: headers,
+      cache: "no-store",
       body: opts.body ? JSON.stringify(opts.body) : undefined,
     }).then(function (res) {
       if (res.status === 404 && !opts.required) return null;
@@ -424,6 +427,14 @@
     return stringifyMarkdown(data, item.projectOverview);
   }
 
+  function legacyField(manifest, key) {
+    var texts = (manifest && manifest.texts) || [];
+    for (var i = 0; i < texts.length; i++) {
+      if (texts[i].key === key) return texts[i].value;
+    }
+    return "";
+  }
+
   function fromLegacy(row, manifest) {
     var slots = manifest && manifest.images ? manifest.images.slice(0, LEGACY_IMAGE_SLOTS) : [];
     var images = slots.map(function (slot) {
@@ -444,11 +455,16 @@
       // Duzi case-study tekst stoji u samoj Framer stranici (polje qHx5bRsBk u
       // handover payloadu), pa se menja prepisom izvora kao i ostali tekstovi.
       texts: ((manifest && manifest.texts) || []).map(function (text) {
-        return { key: text.key, label: text.label, value: text.value, rows: text.rows || 6 };
+        return {
+          key: text.key,
+          field: text.field,
+          label: text.label,
+          value: text.value,
+          rows: text.rows || 6,
+        };
       }),
-      projectOverview:
-        (manifest && manifest.texts && manifest.texts[0] && manifest.texts[0].value) || "",
-      liveLink: "",
+      projectOverview: legacyField(manifest, "project_overview"),
+      liveLink: legacyField(manifest, "live_link"),
       services: [],
       cardImage: row.hero_image || "",
       thumb: { src: thumb.src, alt: thumb.alt || "", match: thumb.match },
@@ -1454,22 +1470,23 @@
     // Framer stranici, pa se drzi u draft.texts i pise prepisom izvora.
     if (isLegacy) {
       draft.texts.forEach(function (text) {
-        fields.push(
-          fieldRow(
-            text.label,
-            el("textarea", {
-              class: "textarea",
-              rows: text.rows,
-              value: text.value,
-              oninput: function (event) {
-                text.value = event.target.value;
-                draft.projectOverview = event.target.value;
-                markDirty();
-              },
-            }),
-            "Duzi case-study tekst na stranici projekta."
-          )
-        );
+        var single = (text.rows || 6) <= 1;
+        var control = el(single ? "input" : "textarea", {
+          class: single ? "input" : "textarea",
+          rows: single ? null : text.rows,
+          value: text.value,
+          oninput: function (event) {
+            text.value = event.target.value;
+            if (text.key === "project_overview") draft.projectOverview = event.target.value;
+            markDirty();
+          },
+        });
+
+        var hint = null;
+        if (text.key === "project_overview") hint = "Duzi case-study tekst na stranici projekta.";
+        else if (text.key === "live_link") hint = "Dugme 'Live Work' na stranici projekta.";
+
+        fields.push(fieldRow(text.label, control, hint));
       });
     } else {
       fields.push(
@@ -2040,6 +2057,74 @@
 
   var HANDOVER = /<script\b[^>]*id="__framer__handoverData"[^>]*>[\s\S]*?<\/script>/i;
 
+  // Tekstualna polja stranice projekta se u payloadu menjaju PO INDEKSU POLJA,
+  // ne pretragom teksta: vrednosti kao "Brand Identity" javljaju se i drugde na
+  // stranici, pa bi slepa zamena pogodila i ono sto ne treba.
+  function updatePayload(html, updates) {
+    var match = HANDOVER.exec(html);
+    if (!match) return html;
+
+    var openEnd = match[0].indexOf(">") + 1;
+    var open = match[0].slice(0, openEnd);
+    var body = match[0].slice(openEnd, match[0].length - "</script>".length);
+
+    var table;
+    try {
+      table = JSON.parse(body);
+    } catch (err) {
+      console.error("handover payload nije validan JSON", err);
+      return html;
+    }
+
+    var record = null;
+    for (var i = 0; i < table.length; i++) {
+      var entry = table[i];
+      if (!entry || typeof entry !== "object" || Array.isArray(entry)) continue;
+      var hit = updates.some(function (update) {
+        return update.field in entry;
+      });
+      if (hit) {
+        record = entry;
+        break;
+      }
+    }
+    if (!record) return html;
+
+    var touched = false;
+    updates.forEach(function (update) {
+      if (!(update.field in record)) return;
+      var index = record[update.field];
+      var slot = table[index];
+      // Vrednost je ili direktno string na tom indeksu, ili omotac
+      // {type, value} ciji `value` pokazuje na string.
+      if (slot && typeof slot === "object" && !Array.isArray(slot) && "value" in slot) {
+        table[slot.value] = update.to;
+      } else {
+        table[index] = update.to;
+      }
+      touched = true;
+    });
+    if (!touched) return html;
+
+    // JSON.stringify ne escape-uje "/", pa bi tekst koji sadrzi "</script>"
+    // prekinuo tag ranije.
+    var serialized = JSON.stringify(table).split("</script>").join("<\\/script>");
+    return html.replace(match[0], open + serialized + "</script>");
+  }
+
+  // Ista vrednost stoji i u renderovanom telu stranice. Menja se ciljano — kao
+  // ceo tekstualni cvor ili cela vrednost atributa — da se ne pogodi podniz.
+  function updateBodyText(html, updates) {
+    updates.forEach(function (update) {
+      var asText = ">" + update.from + "<";
+      html = html.split(asText).join(">" + escapeFor(update.to, "html") + "<");
+
+      var asAttr = '"' + update.from + '"';
+      html = html.split(asAttr).join('"' + update.to.replace(/"/g, "&quot;") + '"');
+    });
+    return html;
+  }
+
   function replaceText(content, pair, context) {
     if (content.indexOf(pair.from) < 0) return content;
     return content.split(pair.from).join(escapeFor(pair.to, context));
@@ -2202,15 +2287,15 @@
     var pairs = changedSlots(draft, state.original);
     var extrasDirty = extrasChanged(draft);
 
-    var textPairs = [];
+    var textUpdates = [];
     (draft.texts || []).forEach(function (text, index) {
       var before = (state.original.texts || [])[index];
       if (before && text.value !== before.value) {
-        textPairs.push({ from: before.value, to: text.value });
+        textUpdates.push({ field: text.field, from: before.value, to: text.value });
       }
     });
 
-    if (!pairs.length && !extrasDirty && !textPairs.length) {
+    if (!pairs.length && !extrasDirty && !textUpdates.length) {
       return Promise.resolve({ message: "CMS: izmena kartice " + draft.title, files: files });
     }
 
@@ -2227,24 +2312,17 @@
     ).then(function (contents) {
       var pageFile = "work/" + draft.slug + "/index.html";
 
-      // Tekst stoji i u telu stranice i u handover payloadu iz kog React
-      // hidrira — zamenjuju se sva pojavljivanja, pa provera trazi da je tekst
-      // pronadjen bar negde, a ne tacno jednom.
-      var textHits = 0;
-      textPairs.forEach(function (pair) {
-        contents.forEach(function (content) {
-          if (content) textHits += content.split(pair.from).length - 1;
-        });
-      });
-      if (textPairs.length && !textHits) {
-        throw new Error(
-          "Stari tekst nije pronadjen u stranici. Pokreni `npm run media-map` da se mapa osvezi."
-        );
-      }
-
       contents.forEach(function (content, index) {
         if (content === null) return;
-        var next = applyReplacements(content, pairs, textPairs, sources[index]);
+        var next = rewriteHtml(content, pairs);
+
+        if (textUpdates.length) {
+          // Payload je merodavan za ono sto se vidi posle hidracije; telo
+          // stranice se menja da se pre hidracije ne vidi stari tekst.
+          next = updatePayload(next, textUpdates);
+          next = updateBodyText(next, textUpdates);
+        }
+
         // Spisak dodatnih slika stoji samo u stranici samog projekta.
         if (sources[index] === pageFile) {
           next = writeExtraBlock(next, galleryMatches(draft), cleanExtras(draft));
@@ -2257,7 +2335,7 @@
       var what = [];
       if (pairs.length) what.push("zamena " + pairs.length + " slike/slika");
       if (extrasDirty) what.push(cleanExtras(draft).length + " dodatnih slika");
-      if (textPairs.length) what.push("tekst");
+      if (textUpdates.length) what.push(textUpdates.length + " tekstualnih polja");
 
       return { message: "CMS: " + draft.title + " — " + what.join(", "), files: files };
     });
