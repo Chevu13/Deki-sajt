@@ -246,6 +246,9 @@ function main() {
   const cmsProjects = loadProjects();
   const legacyProjects = loadLegacyProjects();
   const allProjects = [...legacyProjects, ...cmsProjects];
+  // `noindex` znaci "nevidljiva stranica": van sitemap-a, van /work liste,
+  // dostupna samo direktnim linkom. Stranica se svejedno generise.
+  const listedProjects = allProjects.filter((p) => !p.noindex);
 
   const partials = {
     head: readIfExists(path.join(ROOT, "templates/_head.html")),
@@ -269,10 +272,13 @@ function main() {
     console.log(`built  work/${project.slug}/index.html`);
   }
 
-  fs.writeFileSync(WORK_LIST_FILE, buildWorkListPage(allProjects, partials), "utf8");
-  console.log(`built  work/index.html (${legacyProjects.length} legacy + ${cmsProjects.length} CMS project(s))`);
+  fs.writeFileSync(WORK_LIST_FILE, buildWorkListPage(listedProjects, partials), "utf8");
+  console.log(
+    `built  work/index.html (${listedProjects.length} kartica, ` +
+      `${allProjects.length - listedProjects.length} nelistirano)`
+  );
 
-  const sitemap = buildSitemap(allProjects);
+  const sitemap = buildSitemap(listedProjects);
   fs.writeFileSync(SITEMAP_FILE, sitemap, "utf8");
   console.log(`built  sitemap.xml (${(sitemap.match(/<loc>/g) || []).length} URLs)`);
 
