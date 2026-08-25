@@ -53,18 +53,6 @@
       {
         "src": "/assets/uploads/mt8m37lo-print-design.jpg",
         "alt": ""
-      },
-      {
-        "src": "/assets/uploads/mt8m3au7-door-hanger-mockup-01.jpg",
-        "alt": ""
-      }
-    ],
-    "texts": [
-      {
-        "key": "project_overview",
-        "label": "Project Overview",
-        "value": "This art direction project distills the spirit of a premier Adriatic villa retreat into a complete visual identity. Crisp whites, deep navies, and Mediterranean light guide every design decision — from branded amenities to social presence. The result is a refined, consistent brand world that speaks directly to the luxury traveler seeking privacy, elegance, and the magic of the Croatian coast.",
-        "rows": 6
       }
     ]
   },
@@ -110,15 +98,7 @@
     "sources": [
       "work/falco-gin/index.html"
     ],
-    "extra": [],
-    "texts": [
-      {
-        "key": "project_overview",
-        "label": "Project Overview",
-        "value": "Falco Gin is a handcrafted Swiss premium spirit defined by character, precision, and a bold sensory identity. Distilled in small batches and refined with a unique blend of botanicals and exotic fruits, the brand balances tradition with a contemporary edge. This project focused on translating that identity into a tactile, editorial experience. Through art direction and booklet design, the goal was to create a visual narrative that reflects the essence of Falco — raw, refined, and unapologetically expressive.",
-        "rows": 6
-      }
-    ]
+    "extra": []
   },
   "adria-design-biennale": {
     "thumb": {
@@ -165,15 +145,7 @@
     "sources": [
       "work/adria-design-biennale/index.html"
     ],
-    "extra": [],
-    "texts": [
-      {
-        "key": "project_overview",
-        "label": "Project Overview",
-        "value": "The project explores how a contemporary design festival can exist as a complete design ecosystem—spanning posters, environmental graphics, wayfinding, tickets, banners, motion design, and digital experience. Inspired by international biennales and large-scale cultural events, the goal was to create a bold, flexible, and recognizable identity that moves seamlessly across physical and digital spaces.",
-        "rows": 6
-      }
-    ]
+    "extra": []
   },
   "pletho": {
     "thumb": {
@@ -217,15 +189,7 @@
     "sources": [
       "work/pletho/index.html"
     ],
-    "extra": [],
-    "texts": [
-      {
-        "key": "project_overview",
-        "label": "Project Overview",
-        "value": "The brand was created from the ground up to position Pletho as a forward-thinking, human-centered technology company. Rather than emphasizing limitation, the identity communicates empowerment, precision, and calm support through design.",
-        "rows": 6
-      }
-    ]
+    "extra": []
   },
   "nordarch-studio": {
     "thumb": {
@@ -269,15 +233,7 @@
     "sources": [
       "work/nordarch-studio/index.html"
     ],
-    "extra": [],
-    "texts": [
-      {
-        "key": "project_overview",
-        "label": "Project Overview",
-        "value": "Nordarch Studio is a Belgrade-based architecture firm with a Nordic design philosophy — where structure meets restraint. The brief called for a visual identity that communicates authority, precision, and timelessness. The resulting brand system draws from raw textures, muted tones, and tight typographic hierarchy — reflecting the studio's approach to space and form. Every touchpoint, from business cards to digital presence, was crafted to feel intentional and enduring. The identity positions Nordarch as a studio that doesn't follow trends — it defines them.",
-        "rows": 6
-      }
-    ]
+    "extra": []
   },
   "vellor-residency": {
     "thumb": {
@@ -324,14 +280,6 @@
     "sources": [
       "work/vellor-residency/index.html"
     ],
-    "extra": [],
-    "texts": [
-      {
-        "key": "project_overview",
-        "label": "Project Overview",
-        "value": "Vellor Residency is a contemporary residential development designed for modern urban living — a gated complex offering luxury apartments, private amenities, and rooftop penthouses, set for completion in 2028. The brief called for a brand identity that communicates architectural clarity, long-term value, and structural reliability — appealing equally to future residents and investors. The resulting visual system draws from a restrained palette of Gunmetal, Cadet Grey, and Light Blue, paired with Proxima Nova to balance authority with approachability. From construction signage and outdoor advertising to sales materials and digital presence, every touchpoint was crafted to position Vellor as more than a place to live — as a statement of intent.",
-        "rows": 6
-      }
-    ]
+    "extra": []
   }
 }
