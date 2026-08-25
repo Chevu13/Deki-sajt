@@ -7,33 +7,33 @@
     },
     "images": [
       {
-        "match": "image-e53c5a66",
-        "src": "/assets/images/opt/image-e53c5a66-2560.webp",
+        "match": "/assets/uploads/mt8m22h5-artboard-2.jpg",
+        "src": "/assets/uploads/mt8m22h5-artboard-2.jpg",
         "alt": "Cro Sea Villas branded amenities — premium towel and accessories art direction"
       },
       {
-        "match": "image-d7d720ef",
-        "src": "/assets/images/opt/image-d7d720ef-1024.webp",
+        "match": "/assets/uploads/mt8m25zt-logo-construction.jpg",
+        "src": "/assets/uploads/mt8m25zt-logo-construction.jpg",
         "alt": "Cro Sea Villas brand identity — minimalist mug and product design mockup"
       },
       {
-        "match": "image-e896a320",
-        "src": "/assets/images/opt/image-e896a320-1024.webp",
+        "match": "/assets/uploads/mt8m2baa-sign-mockup.jpg",
+        "src": "/assets/uploads/mt8m2baa-sign-mockup.jpg",
         "alt": "Cro Sea Villas stationery design — business card and print materials brand identity"
       },
       {
-        "match": "image-38c8426f",
-        "src": "/assets/images/opt/image-38c8426f-1024.webp",
+        "match": "/assets/uploads/mt8m2nqr-colors.jpg",
+        "src": "/assets/uploads/mt8m2nqr-colors.jpg",
         "alt": "Cro Sea Villas digital marketing — mobile app and social media presence"
       },
       {
-        "match": "image-0f2926e2",
-        "src": "/assets/images/opt/image-0f2926e2-1024.webp",
+        "match": "/assets/uploads/mt8m2tb3-01.jpg",
+        "src": "/assets/uploads/mt8m2tb3-01.jpg",
         "alt": "Cro Sea Villas visual identity — poster and print design Adriatic villa branding"
       },
       {
-        "match": "image-6968fde2",
-        "src": "/assets/images/opt/image-6968fde2-1024.webp",
+        "match": "/assets/uploads/mt8m2vhu-mug.jpg",
+        "src": "/assets/uploads/mt8m2vhu-mug.jpg",
         "alt": "Cro Sea Villas brand identity — packaging and merchandise design"
       }
     ],
@@ -41,7 +41,24 @@
     "sources": [
       "work/cro-sea-villas/index.html"
     ],
-    "extra": []
+    "extra": [
+      {
+        "src": "/assets/uploads/mt8m2yqy-peskir.jpg",
+        "alt": ""
+      },
+      {
+        "src": "/assets/uploads/mt8m349f-phone-mockup.jpg",
+        "alt": ""
+      },
+      {
+        "src": "/assets/uploads/mt8m37lo-print-design.jpg",
+        "alt": ""
+      },
+      {
+        "src": "/assets/uploads/mt8m3au7-door-hanger-mockup-01.jpg",
+        "alt": ""
+      }
+    ]
   },
   "falco-gin": {
     "thumb": {
