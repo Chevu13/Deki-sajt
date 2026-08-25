@@ -23,77 +23,103 @@ assets/cms.css, cms.js         Stilovi/JS za CMS-generisane stranice (bez Framer
 content/work/*.md              Podaci za nove projekte (izvor za CMS panel)
 content/legacy-work.json       Podaci za originalnih 6 projekata (za work listu)
 templates/                     Template delovi koje scripts/build.mjs sastavlja
-scripts/build.mjs              Generator — pravi work/<slug>/ i work/index.html
+scripts/build.mjs              Generator — pravi work/<slug>/, work/index.html i sitemap.xml
 scripts/resync.mjs             (staro) re-mirror ceo sajt iz novog Framer export-a
 
-admin/                         Decap CMS panel (/admin na živom sajtu)
+admin/                         CMS panel u Framer stilu (/admin na živom sajtu)
+admin-preview/                 isti panel, demo režim bez logina (/admin-preview)
+admin-decap/                   Decap CMS, rezervni panel (/admin-decap)
 api/auth.js, api/callback.js   GitHub OAuth za prijavu u /admin
 ```
 
 ## Deploy na Vercel preko GitHub-a
 
-1. Napravi novi repo na GitHub-u (bez README/gitignore template-a, folder je već spreman):
-   ```bash
-   gh repo create tumenko-portfolio --private --source=. --remote=origin
-   git push -u origin main
-   ```
-   Ili ručno: napravi prazan repo na github.com, pa:
-   ```bash
-   git remote add origin https://github.com/<username>/tumenko-portfolio.git
-   git branch -M main
-   git push -u origin main
-   ```
-2. Idi na [vercel.com/new](https://vercel.com/new), izaberi taj GitHub repo.
-3. Framework Preset: **Other** (nema build korak — Vercel će servirati fajlove kao static site). Build Command i Output Directory ostavi prazne.
-4. Deploy.
+Repo je [github.com/Chevu13/Deki-sajt](https://github.com/Chevu13/Deki-sajt), grana `main`:
 
-Vercel po defaultu servira `about/index.html` na `/about`, `work/pletho/index.html`
-na `/work/pletho`, itd. — isti taj "clean URL" pattern koji sajt već koristi u
-linkovima, tako da ne treba `vercel.json`. Ako neka ruta ipak vrati 404, dodaj:
-
-```json
-{ "cleanUrls": true, "trailingSlash": false }
+```bash
+git remote add origin https://github.com/Chevu13/Deki-sajt.git
+git push -u origin main
 ```
+
+Dejan radi kao **collaborator** na tom repou (Settings → Collaborators). To mu
+daje i push sa svog racunara i login u `/admin` — panel pise preko GitHub
+API-ja, pa mu treba write pravo na repo.
+
+1. Idi na [vercel.com/new](https://vercel.com/new), izaberi taj GitHub repo.
+2. Framework Preset: **Other**. Build Command i Output Directory ostavi prazne —
+   [vercel.json](vercel.json) već zadaje `npm run build` i `outputDirectory: "."`.
+3. Deploy.
+
+`vercel.json` uključuje `cleanUrls` (pa `/about` servira `about/index.html`,
+`/work/pletho` servira `work/pletho/index.html`) i dugotrajni cache za
+optimizovane slike, fontove i video.
 
 ## Dodavanje novih projekata — CMS panel (/admin)
 
-Novi projekti se **ne** dodaju kroz Framer. Postoji sopstveni CMS panel
-([Decap CMS](https://decapcms.org)) na `/admin` gde otvoriš formu (naslov,
-godina, opis, galerija slika/video, link) i klikneš Save — panel sam napravi
-commit na GitHub, Vercel to automatski pokupi, pokrene `scripts/build.mjs` i
-redeploy-uje sajt. Originalnih 6 projekata i sve ostale Framer stranice
-(Home/About/Contact/Privacy Policy/404) ovaj panel ne dira.
+Novi projekti se **ne** dodaju kroz Framer. Na `/admin` stoji sopstveni CMS
+panel — vizuelno kopija Framer-ovog CMS-a (sidebar sa kolekcijom, tabela stavki,
+editor sa poljem po redu), ali umesto Framer-ovog backend-a piše direktno u ovaj
+repozitorijum preko GitHub Contents API-ja. Svaki Publish = commit; Vercel to
+pokupi, pokrene `scripts/build.mjs` i redeploy-uje sajt.
 
-**Jednokratno podešavanje** (posle prvog push-a na GitHub i prvog Vercel deploy-a):
+Panel vidi dve vrste stavki:
+
+| Vrsta | Izvor | Šta se može menjati |
+|---|---|---|
+| **CMS projekti** | `content/work/*.md` | sve — `scripts/build.mjs` iz njih generiše `work/<slug>/index.html` |
+| **Framer projekti** (originalnih 6) | `content/legacy-work.json` | samo kartica na `/work` (Title, Year, Overview, Thumb) |
+
+Originalnih 6 `work/<slug>/index.html` stranica su statički Framer export i
+panel ih **nikad ne dira** — kao ni Home/About/Contact/Privacy Policy/404.
+
+**Jednokratno podešavanje** (posle prvog Vercel deploy-a):
 
 1. **GitHub OAuth App** — na [github.com/settings/developers](https://github.com/settings/developers)
    → "New OAuth App":
-   - Homepage URL: `https://<tvoj-vercel-domen>`
-   - Authorization callback URL: `https://<tvoj-vercel-domen>/api/callback`
+   - Homepage URL: `https://www.dtumenko.com`
+   - Authorization callback URL: `https://www.dtumenko.com/api/callback`
    - Sačuvaj **Client ID** i generiši/sačuvaj **Client Secret**.
-2. **Vercel env varijable** — u Vercel project → Settings → Environment Variables dodaj:
+2. **Vercel env varijable** — u Vercel project → Settings → Environment Variables:
    - `OAUTH_CLIENT_ID` = Client ID iz koraka 1
    - `OAUTH_CLIENT_SECRET` = Client Secret iz koraka 1
    - Redeploy da se varijable primene.
-3. **[admin/config.yml](admin/config.yml)** — zameni dva `TODO` placeholder-a:
-   - `repo:` → tvoj stvarni `username/tumenko-portfolio`
-   - `base_url:` → tvoj stvarni Vercel domen
-   - Commit + push (Vercel redeploy-uje).
-4. Otvori `https://<tvoj-vercel-domen>/admin`, klikni **Login with GitHub**,
-   odobri pristup — panel je spreman za korišćenje.
+3. Otvori `https://www.dtumenko.com/admin`, klikni **Login with GitHub**,
+   odobri pristup (scope `repo`) — panel je spreman.
 
-**Dodavanje projekta:** /admin → Work → New Work → popuni polja (Title, Slug,
-Year, Services, Overview, Hero Image, Gallery — svaka stavka galerije može biti
-slika ili video, Project Overview za duži tekst) → **Publish**. Za par minuta
-(Vercel build) projekat se pojavljuje na `/work` i na svojoj `/work/<slug>`
-stranici.
+Repo i grana su već upisani u [admin/index.html](admin/index.html)
+(`window.CMS_CONFIG`) i u [admin/config.yml](admin/config.yml).
 
-**Lokalni build bez CMS panela** (npr. da ručno dodaš/izmeniš `content/work/*.md`):
+**Dodavanje projekta:** /admin → **+** u toolbaru → popuni Title (Slug se
+predlaže sam), Overview, Project Overview, Year, Service 1–3, Live Link, Thumb i
+Gallery → **Publish**. Za par minuta projekat je na `/work` i na `/work/<slug>`.
+Status **Draft** znači da se projekat ne builduje i ne prikazuje; **Live** ga
+objavljuje.
+
+**Gde šta živi u panelu:**
+
+```
+admin/index.html    konfiguracija (repo, grana, domen) + učitavanje panela
+admin/cms.css       stilovi (Framer look)
+admin/cms.js        cela logika: GitHub API, tabela, editor, upload
+admin/config.yml    konfiguracija za Decap fallback
+admin-preview/      isti panel u demo režimu — bez logina, ništa se ne snima
+admin-decap/        Decap CMS, zadržan kao rezerva ako panel ikad zabaguje
+```
+
+**Poznato ponašanje:** ako se projektu naknadno promeni Slug, ili se projekat
+obriše, stara generisana stranica `work/<stari-slug>/index.html` ostaje u repou
+dok se ručno ne obriše — `scripts/build.mjs` samo dodaje i prepisuje, nikad ne
+briše.
+
+**Lokalni build bez panela** (npr. da ručno dodaš/izmeniš `content/work/*.md`):
 ```bash
 npm install
 npm run build
 git add -A && git commit -m "..." && git push
 ```
+
+`npm run build` uz `work/` regeneriše i `sitemap.xml`, tako da novi projekti
+automatski ulaze u sitemap (postojećim URL-ovima se čuva stari `lastmod`).
 
 ### (Staro) Ako ikad ipak zatreba novi Framer export
 
@@ -101,6 +127,11 @@ Originalnih 6 Framer stranica i home/about/contact i dalje dolaze iz Framer-a.
 Ako se ONE menjaju, koristi `node scripts/resync.mjs https://<export>.rehosted.page`
 (ponovo skine sve Framer stranice + asset-e), pa `git status`/`diff`, pa commit+push.
 Ovo ne dira `/work` listu niti CMS projekte.
+
+> Napomena: resync prepisuje HTML stranice, pa se SEO dodaci (canonical,
+> JSON-LD, skriveni `<h1>`, Google Analytics tag) gube na tim stranicama —
+> treba ih ponovo dodati ili preuzeti iz git istorije.
+
 
 ## Poznato ograničenje
 

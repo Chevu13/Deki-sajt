@@ -1,8 +1,8 @@
 backend:
   name: github
-  repo: YOUR-GITHUB-USERNAME/tumenko-portfolio # TODO: replace with owner/repo after pushing to GitHub
+  repo: Chevu13/Deki-sajt
   branch: main
-  base_url: https://YOUR-VERCEL-DOMAIN.vercel.app # TODO: replace with your deployed Vercel URL
+  base_url: https://www.dtumenko.com
 
 media_folder: "assets/uploads"
 public_folder: "/assets/uploads"

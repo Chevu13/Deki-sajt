@@ -1,127 +1,148 @@
 <!doctype html>
-<html>
+<html lang="sr">
 <head>
   <meta charset="utf-8" />
   <meta name="viewport" content="width=device-width, initial-scale=1.0" />
   <meta name="robots" content="noindex, nofollow" />
-  <title>CMS Demo — Tumenko Portfolio</title>
+  <title>CMS Demo — Dejan Tumenko</title>
   <link href="/assets/images/image-882b5959.png" rel="icon" media="(prefers-color-scheme: light)">
   <link href="/assets/images/image-863a9fee.png" rel="icon" media="(prefers-color-scheme: dark)">
-  <style>
-    #demo-banner {
-      position: fixed; top: 0; left: 0; right: 0; z-index: 100000;
-      background: #111; color: #fff; font: 13px/1.4 -apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif;
-      padding: 8px 16px; text-align: center; letter-spacing: .01em;
-    }
-    #demo-banner b { color: #ffd166; }
-    body { padding-top: 34px; }
-  </style>
+  <link rel="preconnect" href="https://fonts.googleapis.com">
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+  <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600&display=swap" rel="stylesheet">
+  <link rel="stylesheet" href="/admin/cms.css">
 </head>
 <body>
-  <div id="demo-banner">
-    <b>DEMO PANEL</b> — bez logina, samo za pregled. Izmene se <b>ne čuvaju</b> i ne idu na sajt.
-    Pravi panel je na <a href="/admin" style="color:#8ab4ff">/admin</a>.
-  </div>
+  <div id="cms-root"></div>
 
   <script>
-    // Decap "test-repo" backend: sve živi u memoriji browsera — nema GitHub-a,
-    // nema logina, nema commit-a. Save/Publish rade vizuelno, ali se ništa ne
-    // upisuje; refresh vraća na ove seed fajlove ispod.
-    window.CMS_MANUAL_INIT = true;
-    window.repoFiles = {
-      content: {
-        work: {
-          "kalyra-atelier.md": {
-            content: [
-              "---",
-              "title: Kalyra Atelier",
-              "slug: kalyra-atelier",
-              "status: Live",
-              "year: 2025",
-              "services:",
-              "  - Brand Identity",
-              "  - Art Direction",
-              "overview: Visual identity for a Ljubljana-based ceramics studio.",
-              "live_link: ''",
-              "hero_image: /assets/images/opt/image-ed8daf0f-1024.webp",
-              "gallery:",
-              "  - type: image",
-              "    src: /assets/images/opt/image-c59409fa-1024.webp",
-              "    alt: Packaging system",
-              "  - type: image",
-              "    src: /assets/images/opt/image-3faea17f-1024.webp",
-              "    alt: Studio photography",
-              "---",
-              "",
-              "Primer projekta — ovako izgleda popunjena forma i case study stranica.",
-            ].join("\n"),
-          },
-          "novi-projekat.md": {
-            content: [
-              "---",
-              "title: Novi projekat (Draft)",
-              "slug: novi-projekat",
-              "status: Draft",
-              "year: 2026",
-              "services:",
-              "  - Brand Identity",
-              "overview: Draft se ne prikazuje na sajtu dok se ne prebaci na Live.",
-              "live_link: ''",
-              "hero_image: /assets/images/opt/image-c8765043-1024.webp",
-              "gallery: []",
-              "---",
-              "",
-            ].join("\n"),
-          },
+    // Demo mode: identical panel, in-memory store. No GitHub login, no commits
+    // — Publish/Delete run through the UI but write nothing, and a refresh
+    // resets everything to the seed rows below.
+    window.CMS_CONFIG = {
+      demo: true,
+      repo: "Chevu13/Deki-sajt",
+      branch: "main",
+      siteUrl: "https://www.dtumenko.com",
+      contentDir: "content/work",
+      legacyFile: "content/legacy-work.json",
+      mediaFolder: "assets/uploads",
+      publicFolder: "/assets/uploads",
+      seed: [
+        {
+          kind: "legacy",
+          title: "Cro Sea Villas",
+          slug: "cro-sea-villas",
+          status: "Live",
+          year: "2021",
+          overview: "TWO EXCLUSIVE VILLAS NESTLED ON BRAČ ISLAND, CRAFTED FOR THOSE WHO SEEK PRIVACY, ELEGANCE, AND THE TIMELESS BEAUTY OF THE ADRIATIC SEA.",
+          projectOverview: "",
+          liveLink: "",
+          heroImage: "/assets/images/opt/image-0cfec1bd-1024.webp",
+          services: [],
+          gallery: []
         },
-      },
+        {
+          kind: "legacy",
+          title: "Falco Gin",
+          slug: "falco-gin",
+          status: "Live",
+          year: "2021",
+          overview: "ART DIRECTED A PREMIUM PRINT BOOKLET BRIDGING FALCO GIN'S HERITAGE CRAFTSMANSHIP WITH A BOLD, CONTEMPORARY VISUAL IDENTITY.",
+          projectOverview: "",
+          liveLink: "",
+          heroImage: "/assets/images/opt/image-88d192f0-1024.webp",
+          services: [],
+          gallery: []
+        },
+        {
+          kind: "legacy",
+          title: "Adria Design Biennale",
+          slug: "adria-design-biennale",
+          status: "Live",
+          year: "2026",
+          overview: "ADRIA DESIGN BIENNALE 2026 IS A CONCEPTUAL IDENTITY SYSTEM CREATED FOR A MULTIDISCIPLINARY DESIGN FESTIVAL IN SPLIT, CROATIA.",
+          projectOverview: "",
+          liveLink: "",
+          heroImage: "/assets/images/opt/image-ed8daf0f-1024.webp",
+          services: [],
+          gallery: []
+        },
+        {
+          kind: "legacy",
+          title: "Pletho",
+          slug: "pletho",
+          status: "Live",
+          year: "2023",
+          overview: "BRAND IDENTITY DESIGN FOR A HEALTH TECHNOLOGY STARTUP FOCUSED ON ASSISTIVE PRODUCTS.",
+          projectOverview: "",
+          liveLink: "",
+          heroImage: "/assets/images/opt/image-c59409fa-1024.webp",
+          services: [],
+          gallery: []
+        },
+        {
+          kind: "legacy",
+          title: "Nordarch Studio",
+          slug: "nordarch-studio",
+          status: "Live",
+          year: "2024",
+          overview: "CRAFTED A VISUAL IDENTITY FOR AN ARCHITECTURE STUDIO ROOTED IN NORDIC MINIMALISM.",
+          projectOverview: "",
+          liveLink: "",
+          heroImage: "/assets/images/opt/image-3faea17f-1024.webp",
+          services: [],
+          gallery: []
+        },
+        {
+          kind: "legacy",
+          title: "Vellor Residency",
+          slug: "vellor-residency",
+          status: "Live",
+          year: "2025",
+          overview: "DEVELOPED A COMPLETE BRAND IDENTITY FOR A PREMIUM RESIDENTIAL COMPLEX.",
+          projectOverview: "",
+          liveLink: "",
+          heroImage: "/assets/images/opt/image-c8765043-1024.webp",
+          services: [],
+          gallery: []
+        },
+        {
+          kind: "cms",
+          file: "content/work/kalyra-atelier.md",
+          sha: "demo",
+          title: "Kalyra Atelier",
+          slug: "kalyra-atelier",
+          status: "Live",
+          year: "2025",
+          overview: "Visual identity for a Ljubljana-based ceramics studio.",
+          projectOverview: "Primer projekta — ovako izgleda popunjena forma i case study stranica.",
+          liveLink: "https://example.com",
+          heroImage: "/assets/images/opt/image-ed8daf0f-1024.webp",
+          services: ["Brand Identity", "Art Direction", "Packaging"],
+          gallery: [
+            { type: "image", src: "/assets/images/opt/image-c59409fa-1024.webp", alt: "Packaging system" },
+            { type: "image", src: "/assets/images/opt/image-3faea17f-1024.webp", alt: "Studio photography" }
+          ]
+        },
+        {
+          kind: "cms",
+          file: "content/work/novi-projekat.md",
+          sha: "demo",
+          title: "Novi projekat",
+          slug: "novi-projekat",
+          status: "Draft",
+          year: "2026",
+          overview: "Draft se ne prikazuje na sajtu dok se ne prebaci na Live.",
+          projectOverview: "",
+          liveLink: "",
+          heroImage: "/assets/images/opt/image-c8765043-1024.webp",
+          services: ["Brand Identity"],
+          gallery: []
+        }
+      ]
     };
   </script>
-
-  <script src="https://unpkg.com/decap-cms@^3.0.0/dist/decap-cms.js"></script>
-
-  <script>
-    CMS.init({
-      config: {
-        load_config_file: false,
-        backend: { name: "test-repo" },
-        media_folder: "assets/uploads",
-        public_folder: "/assets/uploads",
-        collections: [
-          {
-            name: "work",
-            label: "Work",
-            label_singular: "Project",
-            folder: "content/work",
-            create: true,
-            slug: "{{slug}}",
-            identifier_field: "title",
-            fields: [
-              { label: "Title", name: "title", widget: "string" },
-              { label: "Slug (URL)", name: "slug", widget: "string", hint: "Ide u URL, npr. my-project -> /work/my-project" },
-              { label: "Status", name: "status", widget: "select", options: ["Live", "Draft"], default: "Live", hint: "Draft se ne builduje i ne prikazuje." },
-              { label: "Year", name: "year", widget: "number", value_type: "int" },
-              { label: "Services / Discipline", name: "services", widget: "list", default: ["Brand Identity"] },
-              { label: "Overview", name: "overview", widget: "text", hint: "Kratak opis na kartici u Work listi." },
-              { label: "Live Link", name: "live_link", widget: "string", required: false },
-              { label: "Hero Image", name: "hero_image", widget: "image" },
-              {
-                label: "Gallery",
-                name: "gallery",
-                widget: "list",
-                summary: "{{fields.type}} — {{fields.alt}}",
-                fields: [
-                  { label: "Type", name: "type", widget: "select", options: ["image", "video"], default: "image" },
-                  { label: "File", name: "src", widget: "file", hint: "Slika (jpg/png) ili video (mp4)." },
-                  { label: "Alt text", name: "alt", widget: "string", required: false },
-                ],
-              },
-              { label: "Project Overview", name: "body", widget: "markdown", hint: "Duži case-study tekst na dnu stranice." },
-            ],
-          },
-        ],
-      },
-    });
-  </script>
+  <script src="/admin/cms.js"></script>
 </body>
 </html>
