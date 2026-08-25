@@ -129,9 +129,21 @@ a {
 }
 
 .logo {
-  width: 22px;
-  height: 22px;
+  width: 26px;
+  height: 26px;
   flex: none;
+  object-fit: contain;
+  display: block;
+}
+
+.login__logo {
+  display: flex;
+  justify-content: center;
+}
+
+.login__logo .logo {
+  width: 56px;
+  height: 56px;
 }
 
 .chip {
@@ -772,6 +784,23 @@ a {
 .dropzone:hover {
   border-color: var(--accent);
   color: var(--accent);
+}
+
+/* video slot bez fajla — Framer ga prikazuje kao "Choose File..." polje */
+.filepick {
+  width: 100%;
+  height: 34px;
+  padding: 0 12px;
+  border: 0;
+  border-radius: var(--radius-sm);
+  background: var(--field);
+  color: var(--text-mute);
+  text-align: left;
+}
+
+.filepick:hover {
+  background: var(--field-hover);
+  color: var(--text-dim);
 }
 
 .gallery-item {

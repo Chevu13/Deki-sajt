@@ -59,18 +59,37 @@ optimizovane slike, fontove i video.
 Novi projekti se **ne** dodaju kroz Framer. Na `/admin` stoji sopstveni CMS
 panel — vizuelno kopija Framer-ovog CMS-a (sidebar sa kolekcijom, tabela stavki,
 editor sa poljem po redu), ali umesto Framer-ovog backend-a piše direktno u ovaj
-repozitorijum preko GitHub Contents API-ja. Svaki Publish = commit; Vercel to
-pokupi, pokrene `scripts/build.mjs` i redeploy-uje sajt.
+repozitorijum preko GitHub API-ja. Svaki Publish je **jedan commit** — upload
+slika, izmenjen sadržaj i ažurirane mape idu zajedno (Git Data API), pa Vercel
+pravi jedan build umesto jednog po fajlu.
 
-Panel vidi dve vrste stavki:
+Editor ima ista polja za obe vrste projekata: Title, Status, Slug, Details
+(Overview, Project Overview, Year, Service 1–3, Live Link) i Images
+(**Thumb, Image 1–6, video**).
 
-| Vrsta | Izvor | Šta se može menjati |
+| Vrsta | Izvor | Šta se menja |
 |---|---|---|
-| **CMS projekti** | `content/work/*.md` | sve — `scripts/build.mjs` iz njih generiše `work/<slug>/index.html` |
-| **Framer projekti** (originalnih 6) | `content/legacy-work.json` | samo kartica na `/work` (Title, Year, Overview, Thumb) |
+| **CMS projekti** | `content/work/*.md` | sve; `scripts/build.mjs` iz njih generiše `work/<slug>/index.html` |
+| **Framer projekti** (originalnih 6) | `content/legacy-work.json` + sam HTML | kartica na `/work`, **sve slike i video u stranici**, Status, brisanje |
 
-Originalnih 6 `work/<slug>/index.html` stranica su statički Framer export i
-panel ih **nikad ne dira** — kao ni Home/About/Contact/Privacy Policy/404.
+### Kako se menjaju slike u originalnih 6 stranica
+
+Te stranice nemaju Markdown izvor — one su statički Framer export. Panel im
+menja slike tako što prepiše sam HTML, isto što radi i `scripts/optimize-images.py`.
+Mapa "koja slika je koji slot" je [content/legacy-images.json](content/legacy-images.json),
+koju pravi `npm run legacy-images` čitajući redosled slika iz HTML-a (na svih 6
+stranica je identičan: logo, Thumb, šest slika galerije, zajednička footer slika).
+
+Zamena pogađa **tri mesta** u stranici: `srcset` listu, `src` atribut, i JSON
+payload koji Framer ugrađuje u stranicu za React hidraciju. Preskočiti payload
+znači ostaviti stare URL-ove koje React može da vrati na ekran — zato se menjaju
+sva tri. Testirano: posle zamene i pune hidracije stara slika se ne vraća.
+
+Raspored, tipografija i animacije tih stranica i dalje dolaze iz Framer export-a
+i panel ih ne dira — kao ni Home/About/Contact/Privacy Policy/404.
+
+> Posle novog Framer export-a (`scripts/resync.mjs`) pokreni `npm run legacy-images`
+> da se mapa osveži, jer se hash imena slika menjaju.
 
 **Jednokratno podešavanje** (posle prvog Vercel deploy-a):
 
@@ -90,26 +109,36 @@ Repo i grana su već upisani u [admin/index.html](admin/index.html)
 (`window.CMS_CONFIG`) i u [admin/config.yml](admin/config.yml).
 
 **Dodavanje projekta:** /admin → **+** u toolbaru → popuni Title (Slug se
-predlaže sam), Overview, Project Overview, Year, Service 1–3, Live Link, Thumb i
-Gallery → **Publish**. Za par minuta projekat je na `/work` i na `/work/<slug>`.
-Status **Draft** znači da se projekat ne builduje i ne prikazuje; **Live** ga
-objavljuje.
+predlaže sam), Overview, Project Overview, Year, Service 1–3, Live Link, Thumb,
+Image 1–6 i video → **Publish**. Za par minuta projekat je na `/work` i na
+`/work/<slug>`.
+
+**Status:** `Draft` sklanja projekat sa `/work` liste i iz `sitemap.xml`; `Live`
+ga objavljuje. Kod CMS projekata Draft znači i da se stranica uopšte ne generiše.
+Kod originalnih 6, sama stranica ostaje dostupna na svom URL-u jer je statički
+export — sklanja se samo kartica.
 
 **Gde šta živi u panelu:**
 
 ```
-admin/index.html    konfiguracija (repo, grana, domen) + učitavanje panela
-admin/cms.css       stilovi (Framer look)
-admin/cms.js        cela logika: GitHub API, tabela, editor, upload
-admin/config.yml    konfiguracija za Decap fallback
-admin-preview/      isti panel u demo režimu — bez logina, ništa se ne snima
-admin-decap/        Decap CMS, zadržan kao rezerva ako panel ikad zabaguje
+admin/index.html          konfiguracija (repo, grana, domen) + učitavanje panela
+admin/cms.css             stilovi (Framer look)
+admin/cms.js              cela logika: GitHub API, tabela, editor, upload
+admin/config.yml          konfiguracija za Decap fallback
+admin-preview/            isti panel u demo režimu — bez logina, ništa se ne snima
+admin-decap/              Decap CMS, zadržan kao rezerva ako panel ikad zabaguje
+content/legacy-images.json  mapa slika originalnih 6 stranica
+scripts/legacy-images.mjs   generator te mape (npm run legacy-images)
 ```
 
-**Poznato ponašanje:** ako se projektu naknadno promeni Slug, ili se projekat
-obriše, stara generisana stranica `work/<stari-slug>/index.html` ostaje u repou
-dok se ručno ne obriše — `scripts/build.mjs` samo dodaje i prepisuje, nikad ne
-briše.
+**Poznato ponašanje:** ako se projektu naknadno promeni Slug, stara generisana
+stranica `work/<stari-slug>/index.html` ostaje u repou dok se ručno ne obriše —
+`scripts/build.mjs` samo dodaje i prepisuje, nikad ne briše. (Brisanje projekta
+iz panela briše i fajl.)
+
+> `admin-decap/` je Decap-ov standardni UI nad istim fajlovima. Kod njega se
+> galerija vidi kao lista stavki, a ne kao Image 1–6 slotovi, i ne ume da menja
+> slike u originalnih 6 stranica — to radi samo panel na `/admin`.
 
 **Lokalni build bez panela** (npr. da ručno dodaš/izmeniš `content/work/*.md`):
 ```bash

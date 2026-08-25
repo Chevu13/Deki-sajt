@@ -70,9 +70,14 @@ function loadProjects() {
     .filter((p) => (p.status || "Live") === "Live" && p.slug);
 }
 
+// Framer stranice se ne generisu odavde, ali im kartica na /work dolazi iz
+// legacy-work.json — pa `status: "Draft"` sklanja projekat sa liste i iz
+// sitemap-a. Sama stranica ostaje na svom URL-u (staticki export).
 function loadLegacyProjects() {
   if (!fs.existsSync(LEGACY_FILE)) return [];
-  return JSON.parse(fs.readFileSync(LEGACY_FILE, "utf8"));
+  return JSON.parse(fs.readFileSync(LEGACY_FILE, "utf8")).filter(
+    (project) => (project.status || "Live") === "Live"
+  );
 }
 
 function renderGalleryItems(gallery) {

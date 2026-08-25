@@ -1,23 +1,21 @@
-/* Framer-style CMS panel for the Tumenko portfolio.
+/* CMS panel za Tumenko portfolio — Framer CMS izgled, GitHub kao backend.
  *
- * Same job Decap CMS did (edit content/work/*.md, commit to GitHub, let
- * Vercel rebuild), but with Framer's CMS UI instead of Decap's: a collection
- * sidebar, a spreadsheet-style item table, and a field-per-row item editor.
+ * Dve vrste stavki, isti editor:
  *
- * Data model — one normalized item shape covers two very different sources:
+ *   kind "cms"     content/work/<slug>.md
+ *                  scripts/build.mjs generise work/<slug>/index.html
  *
- *   kind "cms"     content/work/<file>.md   fully editable; scripts/build.mjs
- *                                           generates work/<slug>/index.html
- *   kind "legacy"  content/legacy-work.json the 6 original Framer-authored
- *                                           pages. Their HTML is a static
- *                                           Framer export that this panel must
- *                                           never touch, so only the fields
- *                                           that feed the /work list card
- *                                           (title, year, overview, thumb) are
- *                                           editable.
+ *   kind "legacy"  6 originalnih Framer stranica. Njihov HTML je staticki
+ *                  export bez Markdown izvora, pa se slike menjaju prepisom
+ *                  src/srcset atributa u samom HTML-u — isto sto radi i
+ *                  scripts/optimize-images.py. Mapa "koja slika je koji slot"
+ *                  je content/legacy-images.json (vidi scripts/legacy-images.mjs).
  *
- * Auth is the same GitHub OAuth popup handshake Decap used (api/auth.js +
- * api/callback.js), so no server-side change was needed.
+ * Sve izmene jedne stavke odlaze u JEDAN commit preko Git Data API-ja: upload
+ * slika, prepisan HTML, azuriran manifest i legacy-work.json idu zajedno, pa
+ * Vercel pravi jedan build umesto jednog po fajlu.
+ *
+ * Prijava je GitHub OAuth popup (api/auth.js + api/callback.js).
  */
 
 (function () {
@@ -26,6 +24,7 @@
   var CFG = window.CMS_CONFIG || {};
   var DEMO = !!CFG.demo;
   var TOKEN_KEY = "tumenko-cms-token";
+  var IMAGE_SLOTS = 6;
 
   /* ------------------------------------------------------------ helpers */
 
@@ -51,10 +50,10 @@
     return node;
   }
 
-  function svg(paths, size) {
+  function svg(paths, width) {
     return (
       '<svg class="icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" ' +
-      'stroke-width="' + (size || 1.7) + '" stroke-linecap="round" stroke-linejoin="round">' +
+      'stroke-width="' + (width || 1.7) + '" stroke-linecap="round" stroke-linejoin="round">' +
       paths +
       "</svg>"
     );
@@ -74,13 +73,10 @@
     branch: svg('<circle cx="6" cy="5" r="2"/><circle cx="6" cy="19" r="2"/><circle cx="18" cy="9" r="2"/><path d="M6 7v10M18 11c0 3-4 3-6 4"/>'),
     play: svg('<path d="M8 5.5v13l10-6.5-10-6.5Z"/>'),
     trash: svg('<path d="M4 7h16M9 7V5h6v2M6 7l1 13h10l1-13"/>'),
-    external: svg('<path d="M14 4h6v6M20 4l-9 9M18 14v5a1 1 0 0 1-1 1H5a1 1 0 0 1-1-1V7a1 1 0 0 1 1-1h5"/>'),
     logout: svg('<path d="M9 4H6a2 2 0 0 0-2 2v12a2 2 0 0 0 2 2h3M16 16l4-4-4-4M20 12H10"/>'),
   };
 
-  var LOGO =
-    '<svg class="logo" viewBox="0 0 24 24" fill="currentColor" aria-hidden="true">' +
-    '<path d="M5 2h14v7h-7l7 7v6l-7-7v7H5v-7h7L5 8V2Z"/></svg>';
+  var LOGO = '<img class="logo" src="/assets/images/image-882b5959.png" alt="Dejan Tumenko">';
 
   function toast(message, isError) {
     var host = document.querySelector(".toasts");
@@ -92,7 +88,7 @@
     host.appendChild(node);
     setTimeout(function () {
       node.remove();
-    }, isError ? 8000 : 3500);
+    }, isError ? 9000 : 4000);
   }
 
   function slugify(value) {
@@ -107,7 +103,10 @@
   function b64encode(text) {
     var bytes = new TextEncoder().encode(text);
     var binary = "";
-    for (var i = 0; i < bytes.length; i++) binary += String.fromCharCode(bytes[i]);
+    var CHUNK = 0x8000;
+    for (var i = 0; i < bytes.length; i += CHUNK) {
+      binary += String.fromCharCode.apply(null, bytes.subarray(i, i + CHUNK));
+    }
     return btoa(binary);
   }
 
@@ -127,7 +126,7 @@
     try {
       data = window.jsyaml.load(match[1]) || {};
     } catch (err) {
-      console.error("Bad frontmatter", err);
+      console.error("Neispravan frontmatter", err);
     }
     return { data: data, body: match[2] };
   }
@@ -137,17 +136,18 @@
     return "---\n" + yaml + "---\n\n" + String(body || "").trim() + "\n";
   }
 
-  /* -------------------------------------------------------------- stores */
+  function isVideoPath(value) {
+    return /\.(mp4|webm|mov|m4v)$/i.test(String(value || ""));
+  }
 
-  // Both stores expose the same four methods; everything above this line is
-  // storage-agnostic so the demo panel can run the identical UI offline.
+  /* --------------------------------------------------------------- store */
 
   function GitHubStore(token) {
     this.token = token;
-    this.legacySha = null;
+    this.shas = {};
   }
 
-  GitHubStore.prototype.api = function (path, options) {
+  GitHubStore.prototype.api = function (url, options) {
     var opts = options || {};
     var headers = {
       Accept: "application/vnd.github+json",
@@ -155,62 +155,127 @@
       "X-GitHub-Api-Version": "2022-11-28",
     };
     if (opts.body) headers["Content-Type"] = "application/json";
-    return fetch("https://api.github.com" + path, {
+
+    return fetch("https://api.github.com" + url, {
       method: opts.method || "GET",
       headers: headers,
       body: opts.body ? JSON.stringify(opts.body) : undefined,
     }).then(function (res) {
-      if (res.status === 404) return null;
+      if (res.status === 404 && !opts.required) return null;
       if (res.status === 401) {
         localStorage.removeItem(TOKEN_KEY);
         throw new Error("GitHub prijava je istekla — uloguj se ponovo.");
       }
+      if (res.status === 204) return null;
       return res.json().then(function (json) {
-        if (!res.ok) {
-          throw new Error((json && json.message) || "GitHub API " + res.status);
-        }
+        if (!res.ok) throw new Error((json && json.message) || "GitHub API " + res.status);
         return json;
       });
     });
   };
 
-  GitHubStore.prototype.contentsUrl = function (path) {
-    return (
-      "/repos/" + CFG.repo + "/contents/" + path.split("/").map(encodeURIComponent).join("/")
+  GitHubStore.prototype.repoPath = function (file) {
+    return "/repos/" + CFG.repo + "/contents/" + file.split("/").map(encodeURIComponent).join("/");
+  };
+
+  GitHubStore.prototype.readFile = function (file) {
+    return this.api(this.repoPath(file) + "?ref=" + encodeURIComponent(CFG.branch)).then(
+      function (res) {
+        return res ? b64decode(res.content) : null;
+      }
     );
   };
 
   GitHubStore.prototype.user = function () {
-    return this.api("/user");
+    return this.api("/user", { required: true });
+  };
+
+  // Jedan commit za proizvoljno mnogo fajlova. files: [{path, base64}] ili
+  // [{path, remove: true}]. Contents API bi napravio commit po fajlu.
+  GitHubStore.prototype.commit = function (message, files) {
+    var self = this;
+    var repo = "/repos/" + CFG.repo;
+    var ref = "heads/" + CFG.branch;
+
+    if (!files.length) return Promise.resolve();
+
+    return this.api(repo + "/git/ref/" + ref, { required: true })
+      .then(function (refData) {
+        var baseSha = refData.object.sha;
+        return self.api(repo + "/git/commits/" + baseSha, { required: true }).then(function (c) {
+          return { baseSha: baseSha, baseTree: c.tree.sha };
+        });
+      })
+      .then(function (base) {
+        var blobs = files.map(function (file) {
+          if (file.remove) {
+            return Promise.resolve({ path: file.path, mode: "100644", type: "blob", sha: null });
+          }
+          return self
+            .api(repo + "/git/blobs", {
+              method: "POST",
+              required: true,
+              body: { content: file.base64, encoding: "base64" },
+            })
+            .then(function (blob) {
+              return { path: file.path, mode: "100644", type: "blob", sha: blob.sha };
+            });
+        });
+
+        return Promise.all(blobs).then(function (tree) {
+          return self
+            .api(repo + "/git/trees", {
+              method: "POST",
+              required: true,
+              body: { base_tree: base.baseTree, tree: tree },
+            })
+            .then(function (newTree) {
+              return self.api(repo + "/git/commits", {
+                method: "POST",
+                required: true,
+                body: { message: message, tree: newTree.sha, parents: [base.baseSha] },
+              });
+            })
+            .then(function (newCommit) {
+              return self.api(repo + "/git/refs/" + ref, {
+                method: "PATCH",
+                required: true,
+                body: { sha: newCommit.sha },
+              });
+            });
+        });
+      });
   };
 
   GitHubStore.prototype.load = function () {
     var self = this;
-    var listUrl = this.contentsUrl(CFG.contentDir) + "?ref=" + encodeURIComponent(CFG.branch);
 
-    var cms = this.api(listUrl).then(function (entries) {
+    var cms = this.api(
+      this.repoPath(CFG.contentDir) + "?ref=" + encodeURIComponent(CFG.branch)
+    ).then(function (entries) {
       var files = (entries || []).filter(function (entry) {
         return entry.type === "file" && /\.md$/i.test(entry.name);
       });
       return Promise.all(
         files.map(function (entry) {
-          return self
-            .api(self.contentsUrl(entry.path) + "?ref=" + encodeURIComponent(CFG.branch))
-            .then(function (file) {
-              var parsed = parseMarkdown(b64decode(file.content));
-              return fromMarkdown(parsed, entry.path, file.sha);
-            });
+          return self.readFile(entry.path).then(function (text) {
+            return fromMarkdown(parseMarkdown(text), entry.path);
+          });
         })
       );
     });
 
-    var legacy = this.api(
-      this.contentsUrl(CFG.legacyFile) + "?ref=" + encodeURIComponent(CFG.branch)
-    ).then(function (file) {
-      if (!file) return [];
-      self.legacySha = file.sha;
-      var rows = JSON.parse(b64decode(file.content));
-      return rows.map(fromLegacy);
+    var legacy = Promise.all([
+      this.readFile(CFG.legacyFile),
+      this.readFile(CFG.legacyImagesFile),
+    ]).then(function (results) {
+      if (!results[0]) return [];
+      var rows = JSON.parse(results[0]);
+      var manifest = results[1] ? JSON.parse(results[1]) : {};
+      state.legacyManifest = manifest;
+      return rows.map(function (row) {
+        return fromLegacy(row, manifest[row.slug]);
+      });
     });
 
     return Promise.all([legacy, cms]).then(function (groups) {
@@ -218,89 +283,10 @@
     });
   };
 
-  GitHubStore.prototype.saveItem = function (item, allItems) {
-    var self = this;
-    if (item.kind === "legacy") {
-      var rows = allItems
-        .filter(function (row) {
-          return row.kind === "legacy";
-        })
-        .map(toLegacy);
-      return this.api(this.contentsUrl(CFG.legacyFile), {
-        method: "PUT",
-        body: {
-          message: "CMS: izmena kartice " + item.title,
-          branch: CFG.branch,
-          sha: this.legacySha,
-          content: b64encode(JSON.stringify(rows, null, 2) + "\n"),
-        },
-      }).then(function (res) {
-        self.legacySha = res.content.sha;
-        return item;
-      });
-    }
-
-    var path = item.file || CFG.contentDir + "/" + (item.slug || slugify(item.title)) + ".md";
-    var payload = toMarkdown(item);
-    return this.api(this.contentsUrl(path), {
-      method: "PUT",
-      body: {
-        message: (item.sha ? "CMS: izmena projekta " : "CMS: novi projekat ") + item.title,
-        branch: CFG.branch,
-        sha: item.sha || undefined,
-        content: b64encode(payload),
-      },
-    }).then(function (res) {
-      item.file = path;
-      item.sha = res.content.sha;
-      return item;
-    });
-  };
-
-  GitHubStore.prototype.deleteItem = function (item) {
-    if (item.kind === "legacy" || !item.sha) return Promise.resolve();
-    return this.api(this.contentsUrl(item.file), {
-      method: "DELETE",
-      body: {
-        message: "CMS: brisanje projekta " + item.title,
-        branch: CFG.branch,
-        sha: item.sha,
-      },
-    });
-  };
-
-  GitHubStore.prototype.upload = function (file) {
-    var self = this;
-    var name =
-      Date.now().toString(36) +
-      "-" +
-      slugify(file.name.replace(/\.[^.]+$/, "")) +
-      "." +
-      (file.name.split(".").pop() || "bin").toLowerCase();
-    var path = CFG.mediaFolder + "/" + name;
-
-    return readAsBase64(file).then(function (content) {
-      return self
-        .api(self.contentsUrl(path), {
-          method: "PUT",
-          body: {
-            message: "CMS: upload " + name,
-            branch: CFG.branch,
-            content: content,
-          },
-        })
-        .then(function () {
-          return CFG.publicFolder + "/" + name;
-        });
-    });
-  };
-
+  // Demo panel cita iste JSON fajlove koje sajt vec servira staticki, pa
+  // prikazuje stvarno stanje projekata — samo nista ne upisuje nazad.
   function DemoStore() {
-    this.items = (CFG.seed || []).map(function (row, index) {
-      var copy = JSON.parse(JSON.stringify(row));
-      copy.key = copy.kind + ":" + (copy.slug || index);
-      return copy;
-    });
+    this.items = null;
   }
 
   DemoStore.prototype.user = function () {
@@ -308,118 +294,150 @@
   };
 
   DemoStore.prototype.load = function () {
-    return Promise.resolve(this.items.slice());
+    var self = this;
+    if (this.items) return Promise.resolve(this.items.slice());
+
+    function getJson(file, fallback) {
+      return fetch("/" + file)
+        .then(function (res) {
+          return res.ok ? res.json() : fallback;
+        })
+        .catch(function () {
+          return fallback;
+        });
+    }
+
+    return Promise.all([getJson(CFG.legacyFile, []), getJson(CFG.legacyImagesFile, {})]).then(
+      function (results) {
+        state.legacyManifest = results[1];
+        self.items = results[0].map(function (row) {
+          return fromLegacy(row, results[1][row.slug]);
+        });
+        return self.items.slice();
+      }
+    );
   };
 
-  DemoStore.prototype.saveItem = function (item) {
+  DemoStore.prototype.readFile = function () {
+    return Promise.resolve(null);
+  };
+
+  DemoStore.prototype.commit = function () {
     return new Promise(function (resolve) {
-      setTimeout(function () {
-        resolve(item);
-      }, 350);
+      setTimeout(resolve, 400);
     });
   };
-
-  DemoStore.prototype.deleteItem = function () {
-    return Promise.resolve();
-  };
-
-  DemoStore.prototype.upload = function (file) {
-    return new Promise(function (resolve) {
-      var reader = new FileReader();
-      reader.onload = function () {
-        resolve(reader.result);
-      };
-      reader.readAsDataURL(file);
-    });
-  };
-
-  function readAsBase64(file) {
-    return new Promise(function (resolve, reject) {
-      var reader = new FileReader();
-      reader.onerror = function () {
-        reject(new Error("Ne mogu da procitam fajl."));
-      };
-      reader.onload = function () {
-        resolve(String(reader.result).split(",")[1]);
-      };
-      reader.readAsDataURL(file);
-    });
-  }
 
   /* --------------------------------------------------------- item mapping */
 
-  function fromMarkdown(parsed, path, sha) {
+  function emptySlots(count) {
+    var out = [];
+    for (var i = 0; i < count; i++) out.push({ src: "", alt: "", match: "" });
+    return out;
+  }
+
+  function fromMarkdown(parsed, file) {
     var data = parsed.data || {};
-    var services = data.services;
-    if (!Array.isArray(services)) services = services ? [services] : [];
+    var services = Array.isArray(data.services) ? data.services : data.services ? [data.services] : [];
+    var gallery = Array.isArray(data.gallery) ? data.gallery : [];
+
+    var images = emptySlots(IMAGE_SLOTS);
+    var video = { src: "", match: "" };
+    var slot = 0;
+    gallery.forEach(function (row) {
+      if (!row || !row.src) return;
+      if (row.type === "video" || isVideoPath(row.src)) {
+        if (!video.src) video = { src: row.src, match: row.src };
+        return;
+      }
+      if (slot < IMAGE_SLOTS) {
+        images[slot] = { src: row.src, alt: row.alt || "", match: row.src };
+        slot++;
+      }
+    });
+
     return {
-      key: "cms:" + path,
+      key: "cms:" + file,
       kind: "cms",
-      file: path,
-      sha: sha,
+      file: file,
       title: data.title || "",
-      slug: data.slug || path.split("/").pop().replace(/\.md$/, ""),
+      slug: data.slug || file.split("/").pop().replace(/\.md$/, ""),
       status: data.status === "Draft" ? "Draft" : "Live",
       year: data.year === 0 || data.year ? String(data.year) : "",
       overview: data.overview || "",
       projectOverview: data.project_overview || parsed.body.trim(),
       liveLink: data.live_link || "",
-      heroImage: data.hero_image || "",
       services: services.map(String),
-      gallery: (Array.isArray(data.gallery) ? data.gallery : []).map(function (row) {
-        return {
-          type: row && row.type === "video" ? "video" : "image",
-          src: (row && row.src) || "",
-          alt: (row && row.alt) || "",
-        };
-      }),
+      thumb: { src: data.hero_image || "", alt: "", match: data.hero_image || "" },
+      images: images,
+      video: video,
     };
   }
 
   function toMarkdown(item) {
+    var gallery = item.images
+      .filter(function (image) {
+        return image.src;
+      })
+      .map(function (image) {
+        return { type: "image", src: image.src, alt: image.alt || "" };
+      });
+
+    if (item.video && item.video.src) {
+      gallery.push({ type: "video", src: item.video.src, alt: "" });
+    }
+
     var data = {
       title: item.title,
       slug: item.slug,
       status: item.status,
-      year: item.year === "" ? null : Number(item.year),
+      year: item.year === "" ? undefined : Number(item.year),
       services: item.services.filter(Boolean),
       overview: item.overview,
       live_link: item.liveLink || "",
-      hero_image: item.heroImage || "",
-      gallery: item.gallery.filter(function (row) {
-        return row.src;
-      }),
+      hero_image: item.thumb.src || "",
+      gallery: gallery,
     };
-    if (data.year === null || isNaN(data.year)) delete data.year;
+    if (data.year === undefined || isNaN(data.year)) delete data.year;
     return stringifyMarkdown(data, item.projectOverview);
   }
 
-  function fromLegacy(row) {
+  function fromLegacy(row, manifest) {
+    var slots = manifest && manifest.images ? manifest.images.slice(0, IMAGE_SLOTS) : [];
+    var images = slots.map(function (slot) {
+      return { src: slot.src, alt: slot.alt || "", match: slot.match };
+    });
+    while (images.length < IMAGE_SLOTS) images.push({ src: "", alt: "", match: "" });
+
+    var thumb = (manifest && manifest.thumb) || { src: row.hero_image || "", match: "" };
+
     return {
       key: "legacy:" + row.slug,
       kind: "legacy",
       title: row.title || "",
       slug: row.slug || "",
-      status: "Live",
+      status: row.status === "Draft" ? "Draft" : "Live",
       year: row.year === 0 || row.year ? String(row.year) : "",
       overview: row.overview || "",
       projectOverview: "",
       liveLink: "",
-      heroImage: row.hero_image || "",
       services: [],
-      gallery: [],
+      cardImage: row.hero_image || "",
+      thumb: { src: thumb.src, alt: thumb.alt || "", match: thumb.match },
+      images: images,
+      video: (manifest && manifest.video) || { src: "", match: "" },
     };
   }
 
-  // Key order matters only for a readable diff in content/legacy-work.json.
-  function toLegacy(item) {
+  function toLegacyRow(item) {
     var year = Number(item.year);
     return {
       title: item.title,
       slug: item.slug,
       year: item.year !== "" && !isNaN(year) ? year : undefined,
       overview: item.overview,
-      hero_image: item.heroImage || "",
+      hero_image: item.cardImage || item.thumb.src || "",
+      status: item.status === "Draft" ? "Draft" : undefined,
     };
   }
 
@@ -428,7 +446,6 @@
       key: "cms:new-" + Date.now(),
       kind: "cms",
       file: null,
-      sha: null,
       isNew: true,
       title: "",
       slug: "",
@@ -437,9 +454,10 @@
       overview: "",
       projectOverview: "",
       liveLink: "",
-      heroImage: "",
       services: ["", "", ""],
-      gallery: [],
+      thumb: { src: "", alt: "", match: "" },
+      images: emptySlots(IMAGE_SLOTS),
+      video: { src: "", match: "" },
     };
   }
 
@@ -449,9 +467,11 @@
     store: null,
     user: null,
     items: [],
+    legacyManifest: {},
     view: "list",
     selectedKey: null,
     draft: null,
+    original: null,
     dirty: false,
     saving: false,
     query: "",
@@ -459,6 +479,9 @@
     sortBy: "manual",
     sortDir: "asc",
     checked: {},
+    // Upload-i cekaju u memoriji do Publish-a, da sve ode u jedan commit.
+    // path -> { base64, previewUrl }
+    staged: {},
   };
 
   var root = document.getElementById("cms-root");
@@ -470,13 +493,13 @@
     root.appendChild(
       el("div", { class: "login" }, [
         el("div", { class: "login__card" }, [
-          el("div", { html: LOGO, style: "display:flex;justify-content:center" }),
+          el("div", { html: LOGO, class: "login__logo" }),
           el("h1", { text: "Tumenko CMS" }),
           el("p", {
             text:
               "Prijavi se GitHub nalogom koji ima pristup repozitorijumu " +
               CFG.repo +
-              ". Svaka izmena se snima kao commit i Vercel automatski redeployuje sajt.",
+              ". Svaka izmena je commit, Vercel posle toga sam redeployuje sajt.",
           }),
           el("button", { class: "btn btn--primary", onclick: startLogin }, ["Login with GitHub"]),
           errorMessage ? el("p", { class: "login__error", text: errorMessage }) : null,
@@ -496,13 +519,12 @@
       "width=" + width + ",height=" + height + ",left=" + left + ",top=" + top
     );
     if (!popup) {
-      renderLogin("Browser je blokirao popup prozor — dozvoli popup za ovaj sajt pa probaj ponovo.");
+      renderLogin("Browser je blokirao popup — dozvoli popup za ovaj sajt pa probaj ponovo.");
       return;
     }
 
-    // api/callback.js speaks Decap's handshake: it announces itself with
-    // "authorizing:github", waits for any message back so it learns our
-    // origin, then posts the token. Mirror both halves here.
+    // api/callback.js koristi Decap handshake: javi se sa "authorizing:github",
+    // saceka bilo kakav odgovor da sazna nas origin, pa posalje token.
     function onMessage(event) {
       if (typeof event.data !== "string") return;
       if (event.data === "authorizing:github") {
@@ -515,7 +537,7 @@
       try {
         popup.close();
       } catch (err) {
-        /* popup may already be gone */
+        /* vec zatvoren */
       }
       var payload = JSON.parse(match[2]);
       if (match[1] === "error" || !payload.token) {
@@ -594,6 +616,11 @@
     return null;
   }
 
+  function displaySrc(src) {
+    var staged = state.staged[src];
+    return staged ? staged.previewUrl : src;
+  }
+
   /* -------------------------------------------------------------- render */
 
   function render() {
@@ -635,31 +662,15 @@
       right.push(
         el(
           "button",
-          {
-            class: "btn btn--primary",
-            disabled: !state.dirty || state.saving,
-            onclick: publishDraft,
-          },
+          { class: "btn btn--primary", disabled: !state.dirty || state.saving, onclick: publishDraft },
           ["Publish"]
         )
       );
     } else {
       right.push(
-        el(
-          "a",
-          {
-            class: "btn btn--ghost",
-            href: CFG.siteUrl,
-            target: "_blank",
-            rel: "noopener",
-            title: "Otvori sajt",
-          },
-          [el("span", { html: ICONS.play })]
-        )
-      );
-      right.push(
         el("a", { class: "btn", href: CFG.siteUrl + "/work", target: "_blank", rel: "noopener" }, [
-          "View site",
+          el("span", { html: ICONS.play }),
+          el("span", { text: "View site" }),
         ])
       );
     }
@@ -678,7 +689,10 @@
     return el("header", { class: "topbar" }, [
       el("div", { class: "topbar__left" }, [
         el("span", { html: LOGO }),
-        el("span", { class: "chip" }, [el("span", { text: "CMS" }), el("span", { html: ICONS.chevronDown })]),
+        el("span", { class: "chip" }, [
+          el("span", { text: "CMS" }),
+          el("span", { html: ICONS.chevronDown }),
+        ]),
       ]),
       el("div", { class: "topbar__center" }, [
         el("span", { text: CFG.repo }),
@@ -692,11 +706,7 @@
   }
 
   function renderSidebar() {
-    var tabs = el("nav", { class: "tabs" }, [
-      el("button", { class: "tab is-active" }, ["Collections"]),
-      el("button", { class: "tab", onclick: notImplemented("Fields") }, ["Fields"]),
-      el("button", { class: "tab", onclick: notImplemented("Plugins") }, ["Plugins"]),
-    ]);
+    var tabs = el("nav", { class: "tabs" }, [el("button", { class: "tab is-active" }, ["Collections"])]);
 
     if (state.view === "detail") {
       var rail = el(
@@ -741,18 +751,12 @@
           el("span", { text: "Work Items" }),
           el("span", { class: "collection__count", text: String(state.items.length) }),
         ]),
-        el("button", { class: "collection collection--add", onclick: notImplemented("Add collection") }, [
+        el("button", { class: "collection collection--add", onclick: createItem }, [
           el("span", { html: ICONS.plus }),
           el("span", { text: "Add..." }),
         ]),
       ]),
     ]);
-  }
-
-  function notImplemented(label) {
-    return function () {
-      toast(label + ": ovaj deo Framer panela nije deo ovog CMS-a.");
-    };
   }
 
   function renderMain() {
@@ -815,8 +819,7 @@
 
   function refreshTable() {
     var main = root.querySelector(".main");
-    if (!main) return render();
-    var old = main.querySelector(".table-wrap");
+    var old = main && main.querySelector(".table-wrap");
     if (!old) return render();
     main.replaceChild(renderTable(), old);
     var counter = root.querySelector(".collection__count");
@@ -825,9 +828,11 @@
 
   function toggleAll() {
     var rows = visibleItems();
-    var allOn = rows.length > 0 && rows.every(function (item) {
-      return state.checked[item.key];
-    });
+    var allOn =
+      rows.length > 0 &&
+      rows.every(function (item) {
+        return state.checked[item.key];
+      });
     rows.forEach(function (item) {
       if (allOn) delete state.checked[item.key];
       else state.checked[item.key] = true;
@@ -837,9 +842,11 @@
 
   function renderTable() {
     var rows = visibleItems();
-    var allChecked = rows.length > 0 && rows.every(function (item) {
-      return state.checked[item.key];
-    });
+    var allChecked =
+      rows.length > 0 &&
+      rows.every(function (item) {
+        return state.checked[item.key];
+      });
 
     var head = el("thead", {}, [
       el("tr", {}, [
@@ -902,9 +909,8 @@
       })
     );
 
-    var table = el("table", { class: "table" }, [head, body]);
-    var wrap = el("div", { class: "table-wrap" }, [
-      table,
+    return el("div", { class: "table-wrap" }, [
+      el("table", { class: "table" }, [head, body]),
       rows.length
         ? null
         : el("div", {
@@ -914,16 +920,10 @@
               : "Jos nema projekata — klikni + da dodas prvi.",
           }),
     ]);
-    return wrap;
   }
 
   function statusPill(item) {
     var isLive = item.status === "Live";
-    if (item.kind === "legacy") {
-      return el("span", { class: "pill pill--framer", title: "Framer stranica — status se ne menja" }, [
-        el("span", { text: "Framer" }),
-      ]);
-    }
     return el(
       "button",
       {
@@ -944,19 +944,21 @@
     var menu = el("div", { class: "menu" }, children);
     menu.style.visibility = "hidden";
     document.body.appendChild(menu);
-    var height = menu.offsetHeight;
     var top = rect.bottom + 6;
-    if (top + height > window.innerHeight - 8) top = Math.max(8, rect.top - height - 6);
+    if (top + menu.offsetHeight > window.innerHeight - 8) {
+      top = Math.max(8, rect.top - menu.offsetHeight - 6);
+    }
     menu.style.top = top + "px";
     menu.style.left = Math.min(rect.left, window.innerWidth - menu.offsetWidth - 8) + "px";
     menu.style.visibility = "visible";
-    setTimeout(function () {
-      document.addEventListener("mousedown", onOutside);
-    }, 0);
+
     function onOutside(event) {
       if (!menu.contains(event.target)) closeMenu();
     }
     menu._onOutside = onOutside;
+    setTimeout(function () {
+      document.addEventListener("mousedown", onOutside);
+    }, 0);
   }
 
   function closeMenu() {
@@ -986,7 +988,7 @@
       menuItem("Live", function () {
         setStatus(item, "Live");
       }),
-      menuItem("Draft", function () {
+      menuItem("Draft (pauza)", function () {
         setStatus(item, "Draft");
       }),
     ]);
@@ -1050,33 +1052,29 @@
   }
 
   function openRowMenu(anchor, item) {
-    var children = [
+    openMenu(anchor, [
       menuItem("Otvori", function () {
         openItem(item.key);
       }),
       menuItem("Otvori stranicu na sajtu", function () {
         window.open(CFG.siteUrl + "/work/" + item.slug, "_blank", "noopener");
       }),
-    ];
-    if (item.kind === "cms") {
-      children.push(el("div", { class: "menu__sep" }));
-      children.push(
-        menuItem("Obrisi projekat", function () {
+      el("div", { class: "menu__sep" }),
+      menuItem(
+        "Obrisi projekat",
+        function () {
           deleteItem(item);
-        }, "btn--danger")
-      );
-    }
-    openMenu(anchor, children);
+        },
+        "btn--danger"
+      ),
+    ]);
   }
 
   /* -------------------------------------------------------------- editor */
 
-  // A "+ new" item is pushed into state.items right away so the editor and the
-  // sidebar rail can address it by key, but it exists only in the browser until
-  // the first Publish. Abandoning it must not leave a phantom row in the table.
   function dropUnsavedNew(exceptKey) {
     state.items = state.items.filter(function (item) {
-      return !(item.isNew && !item.sha && item.key !== exceptKey);
+      return !(item.isNew && item.key !== exceptKey);
     });
   }
 
@@ -1087,6 +1085,7 @@
     if (!item) return;
     state.selectedKey = key;
     state.draft = JSON.parse(JSON.stringify(item));
+    state.original = JSON.parse(JSON.stringify(item));
     while (state.draft.kind === "cms" && state.draft.services.length < 3) {
       state.draft.services.push("");
     }
@@ -1100,6 +1099,7 @@
     dropUnsavedNew(null);
     state.view = "list";
     state.draft = null;
+    state.original = null;
     state.selectedKey = null;
     state.dirty = false;
     render();
@@ -1112,13 +1112,14 @@
     state.items.push(item);
     state.selectedKey = item.key;
     state.draft = JSON.parse(JSON.stringify(item));
+    state.original = JSON.parse(JSON.stringify(item));
     state.dirty = true;
     state.view = "detail";
     render();
   }
 
-  // Only the topbar reacts to dirtiness (save state + Publish button), so
-  // avoid a full re-render — it would blow away focus in the field being typed.
+  // Samo topbar reaguje na dirty stanje; pun re-render bi izbacio fokus iz
+  // polja u koje se kuca.
   function markDirty() {
     if (state.dirty) return;
     state.dirty = true;
@@ -1139,7 +1140,7 @@
           value: draft.title,
           oninput: function (event) {
             draft.title = event.target.value;
-            if (draft.isNew && !draft.slug) {
+            if (draft.isNew && !draft.slugTouched) {
               draft.slug = slugify(draft.title);
               var slugInput = root.querySelector("[data-slug-input]");
               if (slugInput) slugInput.value = draft.slug;
@@ -1154,25 +1155,29 @@
     fields.push(
       fieldRow(
         "Status",
-        isLegacy
-          ? el("span", { class: "pill pill--framer", text: "Framer" })
-          : el("span", { class: "status-select pill " + (draft.status === "Live" ? "pill--live" : "pill--draft") }, [
-              el(
-                "select",
-                {
-                  onchange: function (event) {
-                    draft.status = event.target.value;
-                    markDirty();
-                    rerenderEditor();
-                  },
+        el(
+          "span",
+          { class: "status-select pill " + (draft.status === "Live" ? "pill--live" : "pill--draft") },
+          [
+            el(
+              "select",
+              {
+                onchange: function (event) {
+                  draft.status = event.target.value;
+                  markDirty();
+                  rerenderEditor();
                 },
-                [
-                  el("option", { value: "Live", selected: draft.status === "Live" }, ["Live"]),
-                  el("option", { value: "Draft", selected: draft.status === "Draft" }, ["Draft"]),
-                ]
-              ),
-            ]),
-        isLegacy ? "Ova stranica je staticki Framer export — status se ne menja iz panela." : null
+              },
+              [
+                el("option", { value: "Live", selected: draft.status === "Live" }, ["Live"]),
+                el("option", { value: "Draft", selected: draft.status === "Draft" }, ["Draft"]),
+              ]
+            ),
+          ]
+        ),
+        isLegacy && draft.status === "Draft"
+          ? "Draft sklanja karticu sa /work i iz sitemap-a. Sama stranica ostaje dostupna na direktan link jer je staticki Framer export."
+          : null
       )
     );
 
@@ -1185,6 +1190,7 @@
           disabled: isLegacy,
           "data-slug-input": "1",
           oninput: function (event) {
+            draft.slugTouched = true;
             draft.slug = slugify(event.target.value);
             markDirty();
             updateSlugHint();
@@ -1193,7 +1199,7 @@
             event.target.value = draft.slug;
           },
         }),
-        null,
+        isLegacy ? "Slug je zakucan uz postojecu Framer stranicu." : null,
         el("p", { class: "field__hint", "data-slug-hint": "1" }, [
           el("span", { html: ICONS.globe }),
           el("span", { text: prettyUrl(draft.slug) }),
@@ -1215,7 +1221,9 @@
             markDirty();
           },
         }),
-        "Kratak opis na kartici u /work listi i u meta description-u."
+        isLegacy
+          ? "Kratak opis na kartici u /work listi."
+          : "Kratak opis na kartici u /work listi i u meta description-u."
       )
     );
 
@@ -1305,18 +1313,18 @@
     fields.push(
       fieldRow(
         "Thumb",
-        mediaSlot(draft.heroImage, function (path) {
-          draft.heroImage = path;
-          markDirty();
-          rerenderEditor();
-        }),
-        "Naslovna slika — koristi se na kartici u /work listi."
+        mediaSlot(draft.thumb, "image"),
+        isLegacy
+          ? "Naslovna slika — kartica na /work i velika slika na vrhu stranice projekta."
+          : "Naslovna slika — kartica na /work i vrh stranice projekta."
       )
     );
 
-    if (!isLegacy) {
-      fields.push(fieldRow("Gallery", galleryEditor(draft)));
-    }
+    draft.images.forEach(function (image, index) {
+      fields.push(fieldRow("Image " + (index + 1), mediaSlot(image, "image")));
+    });
+
+    fields.push(fieldRow("video", mediaSlot(draft.video, "video")));
 
     if (isLegacy) {
       fields.push(
@@ -1325,15 +1333,15 @@
           el("p", {
             class: "field__hint",
             text:
-              "Napomena: HTML stranice ovih 6 projekata dolaze iz Framer export-a i " +
-              "panel ih ne dira. Ovde se menja samo kartica na /work listi.",
+              "Ovo je originalna Framer stranica. Slike i tekst kartice se menjaju " +
+              "odavde; raspored i animacije same stranice dolaze iz Framer export-a.",
           })
         )
       );
     }
 
     var actions = [];
-    if (draft.kind === "cms" && !draft.isNew) {
+    if (!draft.isNew) {
       actions.push(
         el(
           "button",
@@ -1359,9 +1367,9 @@
 
   function rerenderEditor() {
     var main = root.querySelector(".main");
-    if (!main) return render();
-    var old = main.querySelector(".editor");
-    var scrollTop = old ? old.scrollTop : 0;
+    var old = main && main.querySelector(".editor");
+    if (!old) return render();
+    var scrollTop = old.scrollTop;
     var next = renderEditor();
     main.replaceChild(next, old);
     next.scrollTop = scrollTop;
@@ -1391,118 +1399,64 @@
     return el("div", { class: "section" }, [el("span", { text: label })]);
   }
 
-  function mediaSlot(value, onChange) {
-    var children = [];
-    if (value) {
-      var isVideo = /\.(mp4|webm|mov)$/i.test(value);
-      children.push(
-        el("div", { class: "thumb" }, [
-          isVideo
-            ? el("video", { src: value, muted: true })
-            : el("img", { src: value, alt: "" }),
-          el(
-            "button",
-            {
-              class: "thumb__remove",
-              title: "Ukloni",
-              onclick: function () {
-                onChange("");
-              },
+  // slot je { src, alt, match } — menja se u mestu da bi draft ostao jedan objekat.
+  function mediaSlot(slot, kind) {
+    var accept = kind === "video" ? "video/mp4,video/webm" : "image/*";
+
+    if (!slot.src) {
+      return el("div", { class: "media" }, [
+        el(
+          "button",
+          {
+            class: kind === "video" ? "filepick" : "dropzone",
+            onclick: function () {
+              pickFile(accept, function (file) {
+                stageFile(file, slot);
+              });
             },
-            ["×"]
-          ),
-        ])
-      );
+          },
+          [kind === "video" ? "Choose File..." : "Upload"]
+        ),
+      ]);
     }
-    children.push(
+
+    var preview = displaySrc(slot.src);
+    return el("div", { class: "media" }, [
+      el("div", { class: "thumb" }, [
+        isVideoPath(slot.src) || kind === "video"
+          ? el("video", { src: preview, muted: true, playsinline: true })
+          : el("img", { src: preview, alt: slot.alt || "" }),
+        el(
+          "button",
+          {
+            class: "thumb__remove",
+            title: "Ukloni",
+            onclick: function () {
+              slot.src = "";
+              markDirty();
+              rerenderEditor();
+            },
+          },
+          ["×"]
+        ),
+      ]),
       el(
         "button",
         {
           class: "dropzone",
           onclick: function () {
-            pickFile(function (file) {
-              uploadFile(file, onChange);
+            pickFile(accept, function (file) {
+              stageFile(file, slot);
             });
           },
         },
-        [value ? "Zameni" : "Upload"]
-      )
-    );
-    return el("div", { class: "media" }, children);
+        ["Zameni"]
+      ),
+    ]);
   }
 
-  function galleryEditor(draft) {
-    var rows = draft.gallery.map(function (row, index) {
-      return el("div", { class: "gallery-item" }, [
-        mediaSlot(row.src, function (path) {
-          row.src = path;
-          markDirty();
-          rerenderEditor();
-        }),
-        el("div", { class: "gallery-item__fields" }, [
-          el("div", { class: "gallery-item__row" }, [
-            el(
-              "select",
-              {
-                class: "selectbox",
-                onchange: function (event) {
-                  row.type = event.target.value;
-                  markDirty();
-                },
-              },
-              [
-                el("option", { value: "image", selected: row.type !== "video" }, ["image"]),
-                el("option", { value: "video", selected: row.type === "video" }, ["video"]),
-              ]
-            ),
-            el("input", {
-              class: "input",
-              placeholder: "Alt tekst",
-              value: row.alt,
-              oninput: function (event) {
-                row.alt = event.target.value;
-                markDirty();
-              },
-            }),
-          ]),
-          el(
-            "button",
-            {
-              class: "btn btn--ghost btn--danger",
-              style: "align-self:flex-start",
-              onclick: function () {
-                draft.gallery.splice(index, 1);
-                markDirty();
-                rerenderEditor();
-              },
-            },
-            ["Ukloni"]
-          ),
-        ]),
-      ]);
-    });
-
-    rows.push(
-      el(
-        "button",
-        {
-          class: "btn",
-          onclick: function () {
-            draft.gallery.push({ type: "image", src: "", alt: "" });
-            markDirty();
-            rerenderEditor();
-          },
-        },
-        [el("span", { html: ICONS.plus }), el("span", { text: "Dodaj stavku" })]
-      )
-    );
-
-    return el("div", {}, rows);
-  }
-
-  function pickFile(onPick) {
-    var input = el("input", { type: "file", accept: "image/*,video/mp4,video/webm" });
-    input.style.display = "none";
+  function pickFile(accept, onPick) {
+    var input = el("input", { type: "file", accept: accept, style: "display:none" });
     document.body.appendChild(input);
     input.addEventListener("change", function () {
       if (input.files && input.files[0]) onPick(input.files[0]);
@@ -1511,21 +1465,123 @@
     input.click();
   }
 
-  function uploadFile(file, onChange) {
-    toast("Uploadujem " + file.name + "…");
-    state.store
-      .upload(file)
-      .then(function (path) {
-        onChange(path);
-        toast("Upload gotov.");
-      })
-      .catch(function (err) {
-        console.error(err);
-        toast("Upload nije uspeo: " + err.message, true);
-      });
+  // Fajl se ne salje odmah — cuva se u memoriji i ulazi u isti commit kao
+  // ostatak izmena kad se klikne Publish.
+  function stageFile(file, slot) {
+    var extension = (file.name.split(".").pop() || "bin").toLowerCase();
+    var base = slugify(file.name.replace(/\.[^.]+$/, "")) || "file";
+    var path = CFG.publicFolder + "/" + Date.now().toString(36) + "-" + base + "." + extension;
+
+    var reader = new FileReader();
+    reader.onerror = function () {
+      toast("Ne mogu da procitam fajl.", true);
+    };
+    reader.onload = function () {
+      var dataUrl = String(reader.result);
+      state.staged[path] = {
+        base64: dataUrl.split(",")[1],
+        previewUrl: dataUrl,
+        repoPath: CFG.mediaFolder + "/" + path.split("/").pop(),
+      };
+      slot.src = path;
+      markDirty();
+      rerenderEditor();
+    };
+    reader.readAsDataURL(file);
   }
 
   /* --------------------------------------------------------------- write */
+
+  function stagedFilesFor(item) {
+    var used = [item.thumb.src, item.video.src].concat(
+      item.images.map(function (image) {
+        return image.src;
+      })
+    );
+    var files = [];
+    used.forEach(function (src) {
+      var staged = state.staged[src];
+      if (!staged) return;
+      var already = files.some(function (file) {
+        return file.path === staged.repoPath;
+      });
+      if (!already) files.push({ path: staged.repoPath, base64: staged.base64 });
+    });
+    return files;
+  }
+
+  // Vraca listu { match, src } za slotove kojima se slika promenila.
+  function changedSlots(draft, original) {
+    var pairs = [];
+    if (draft.thumb.src !== original.thumb.src && original.thumb.match) {
+      pairs.push({ match: original.thumb.match, src: draft.thumb.src });
+    }
+    draft.images.forEach(function (image, index) {
+      var before = original.images[index];
+      if (before && before.match && image.src !== before.src) {
+        pairs.push({ match: before.match, src: image.src });
+      }
+    });
+    if (draft.video.src !== original.video.src && original.video.match) {
+      pairs.push({ match: original.video.match, src: draft.video.src });
+    }
+    return pairs;
+  }
+
+  // Zamena slike u Framer-exportovanoj stranici.
+  //
+  // Ista slika stoji na tri mesta: u `srcset` listi (vise velicina), u `src`
+  // atributu, i u JSON payload-u koji Framer ugradjuje u stranicu i iz kog
+  // React hidrira. Preskociti payload znaci ostaviti stare URL-ove koje React
+  // moze da vrati na ekran, pa se menjaju sva tri.
+  function rewriteHtml(html, pairs) {
+    pairs.forEach(function (pair) {
+      if (!pair.src) return;
+
+      // Nova slika je jedan fajl bez varijanti, pa cela srcset lista pada na
+      // jedan unos umesto da se ponovi uz svaki deskriptor.
+      html = html.replace(/srcset="([^"]*)"/gi, function (attr, value) {
+        return value.indexOf(pair.match) >= 0 ? 'srcset="' + pair.src + '"' : attr;
+      });
+
+      var optImage = /^image-[a-f0-9]+$/i.test(pair.match);
+      if (optImage) {
+        // `image-abc123` pokriva sve velicine: -512, -1024, -2048, -2560.
+        var sized = new RegExp("/assets/images/opt/" + pair.match + "-\\d+\\.webp", "g");
+        html = html.replace(sized, pair.src);
+      } else {
+        html = html.split(pair.match).join(pair.src);
+      }
+    });
+    return html;
+  }
+
+  function updatedManifest(draft) {
+    var manifest = JSON.parse(JSON.stringify(state.legacyManifest || {}));
+    var entry = manifest[draft.slug] || { thumb: null, images: [], video: null };
+
+    entry.thumb = draft.thumb.src
+      ? { match: draft.thumb.src === state.original.thumb.src ? draft.thumb.match : draft.thumb.src,
+          src: draft.thumb.src, alt: draft.thumb.alt || "" }
+      : null;
+
+    entry.images = draft.images.map(function (image, index) {
+      var before = state.original.images[index] || {};
+      return {
+        match: image.src === before.src ? before.match || image.src : image.src,
+        src: image.src,
+        alt: image.alt || "",
+      };
+    });
+
+    entry.video = draft.video.src
+      ? { match: draft.video.src === state.original.video.src ? draft.video.match : draft.video.src,
+          src: draft.video.src }
+      : null;
+
+    manifest[draft.slug] = entry;
+    return manifest;
+  }
 
   function publishDraft() {
     var draft = state.draft;
@@ -1542,7 +1598,7 @@
         return item.key !== draft.key && item.slug === draft.slug;
       });
       if (clash.length) {
-        toast("Slug \"" + draft.slug + "\" vec postoji.", true);
+        toast('Slug "' + draft.slug + '" vec postoji.', true);
         return;
       }
     }
@@ -1550,29 +1606,36 @@
     state.saving = true;
     render();
 
-    var target = findItem(draft.key);
-    Object.keys(draft).forEach(function (key) {
-      target[key] = draft[key];
-    });
-    target.services = target.services.filter(function (value) {
-      return String(value).trim() !== "";
-    });
-
-    state.store
-      .saveItem(target, state.items)
+    buildCommit(draft)
+      .then(function (payload) {
+        return state.store.commit(payload.message, payload.files);
+      })
       .then(function () {
-        target.isNew = false;
+        return state.store.load();
+      })
+      .then(function (items) {
+        state.items = items;
+        state.staged = {};
         state.saving = false;
         state.dirty = false;
-        state.draft = JSON.parse(JSON.stringify(target));
-        while (state.draft.kind === "cms" && state.draft.services.length < 3) {
-          state.draft.services.push("");
+        var key =
+          draft.kind === "legacy"
+            ? "legacy:" + draft.slug
+            : "cms:" + (draft.file || CFG.contentDir + "/" + draft.slug + ".md");
+        var refreshed = findItem(key);
+        if (refreshed) {
+          state.selectedKey = refreshed.key;
+          state.draft = JSON.parse(JSON.stringify(refreshed));
+          state.original = JSON.parse(JSON.stringify(refreshed));
+        } else {
+          state.view = "list";
+          state.draft = null;
         }
         render();
         toast(
           DEMO
             ? "Demo: izmena nije sacuvana."
-            : "Sacuvano. Vercel gradi sajt — za par minuta je uzivo."
+            : "Sacuvano u jednom commit-u. Vercel gradi sajt — za par minuta je uzivo."
         );
       })
       .catch(function (err) {
@@ -1583,13 +1646,79 @@
       });
   }
 
+  function buildCommit(draft) {
+    var files = stagedFilesFor(draft);
+
+    if (draft.kind === "cms") {
+      var path = draft.file || CFG.contentDir + "/" + draft.slug + ".md";
+      draft.services = draft.services.filter(function (value) {
+        return String(value).trim() !== "";
+      });
+      files.push({ path: path, base64: b64encode(toMarkdown(draft)) });
+      return Promise.resolve({
+        message: (draft.isNew ? "CMS: novi projekat " : "CMS: izmena ") + draft.title,
+        files: files,
+      });
+    }
+
+    // Kartica na /work je do sad koristila manju varijantu iste slike; kad se
+    // Thumb zameni, karticu preuzima nova slika.
+    if (draft.thumb.src !== state.original.thumb.src) {
+      draft.cardImage = draft.thumb.src;
+    }
+
+    // Legacy: kartica u legacy-work.json, slike u HTML-u, mapa u manifestu.
+    var rows = state.items
+      .filter(function (item) {
+        return item.kind === "legacy";
+      })
+      .map(function (item) {
+        return toLegacyRow(item.key === draft.key ? draft : item);
+      });
+
+    files.push({ path: CFG.legacyFile, base64: b64encode(JSON.stringify(rows, null, 2) + "\n") });
+    files.push({
+      path: CFG.legacyImagesFile,
+      base64: b64encode(JSON.stringify(updatedManifest(draft), null, 2) + "\n"),
+    });
+
+    var pairs = changedSlots(draft, state.original);
+    if (!pairs.length) {
+      return Promise.resolve({ message: "CMS: izmena kartice " + draft.title, files: files });
+    }
+
+    var htmlPath = "work/" + draft.slug + "/index.html";
+    return state.store.readFile(htmlPath).then(function (html) {
+      if (html) {
+        files.push({ path: htmlPath, base64: b64encode(rewriteHtml(html, pairs)) });
+      }
+      return {
+        message: "CMS: " + draft.title + " — zamena " + pairs.length + " slike/slika",
+        files: files,
+      };
+    });
+  }
+
   function setStatus(item, status) {
     if (item.status === status) return;
     var previous = item.status;
     item.status = status;
     refreshTable();
+
+    var files;
+    if (item.kind === "legacy") {
+      var rows = state.items
+        .filter(function (row) {
+          return row.kind === "legacy";
+        })
+        .map(toLegacyRow);
+      files = [{ path: CFG.legacyFile, base64: b64encode(JSON.stringify(rows, null, 2) + "\n") }];
+    } else {
+      files = [{ path: item.file, base64: b64encode(toMarkdown(item)) }];
+    }
+
     state.store
-      .saveItem(item, state.items)
+      .commit("CMS: " + item.title + " -> " + status, files)
       .then(function () {
         toast(DEMO ? "Demo: status nije sacuvan." : "Status: " + status + ". Sajt se gradi.");
       })
@@ -1601,25 +1730,55 @@
   }
 
   function deleteItem(item) {
-    if (!confirm('Obrisati "' + item.title + '"? Ovo brise content fajl iz repozitorijuma.')) return;
-    state.store
-      .deleteItem(item)
-      .then(function () {
+    var extra =
+      item.kind === "legacy"
+        ? "\n\nBrise se i sama Framer stranica work/" + item.slug + "/index.html."
+        : "";
+    if (!confirm('Obrisati "' + item.title + '"?' + extra)) return;
+
+    var files = [];
+    if (item.kind === "legacy") {
+      var rows = state.items
+        .filter(function (row) {
+          return row.kind === "legacy" && row.key !== item.key;
+        })
+        .map(toLegacyRow);
+      var manifest = JSON.parse(JSON.stringify(state.legacyManifest || {}));
+      delete manifest[item.slug];
+      files.push({ path: CFG.legacyFile, base64: b64encode(JSON.stringify(rows, null, 2) + "\n") });
+      files.push({
+        path: CFG.legacyImagesFile,
+        base64: b64encode(JSON.stringify(manifest, null, 2) + "\n"),
+      });
+      files.push({ path: "work/" + item.slug + "/index.html", remove: true });
+    } else {
+      if (item.isNew) {
         state.items = state.items.filter(function (row) {
           return row.key !== item.key;
         });
         state.view = "list";
         state.draft = null;
+        state.dirty = false;
+        render();
+        return;
+      }
+      files.push({ path: item.file, remove: true });
+    }
+
+    state.store
+      .commit("CMS: brisanje projekta " + item.title, files)
+      .then(function () {
+        return state.store.load();
+      })
+      .then(function (items) {
+        state.items = items;
+        state.view = "list";
+        state.draft = null;
+        state.original = null;
         state.selectedKey = null;
         state.dirty = false;
         render();
-        toast(
-          DEMO
-            ? "Demo: nista nije obrisano."
-            : "Obrisano. Napomena: generisana stranica work/" +
-              item.slug +
-              "/index.html ostaje u repou dok se rucno ne obrise."
-        );
+        toast(DEMO ? "Demo: nista nije obrisano." : "Obrisano. Sajt se gradi.");
       })
       .catch(function (err) {
         toast("Brisanje nije uspelo: " + err.message, true);
@@ -1633,6 +1792,7 @@
         state.items = items;
         state.view = "list";
         state.draft = null;
+        state.original = null;
         state.dirty = false;
         render();
         toast("Osvezeno.");
