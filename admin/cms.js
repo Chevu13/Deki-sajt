@@ -447,6 +447,14 @@
       cardImage: row.hero_image || "",
       thumb: { src: thumb.src, alt: thumb.alt || "", match: thumb.match },
       images: images,
+      // Slike preko Framer-ovih sest — ubacuje ih assets/legacy-gallery.js
+      // posle hidracije, iz JSON bloka u samoj stranici.
+      extraImages: ((manifest && manifest.extra) || []).map(function (image) {
+        return { src: image.src, alt: image.alt || "" };
+      }),
+      knownGallery: images.map(function (image) {
+        return image.match;
+      }),
       video: (manifest && manifest.video) || { src: "", match: "" },
       sources:
         manifest && manifest.sources && manifest.sources.length
@@ -1554,26 +1562,43 @@
       );
     });
 
-    if (!isLegacy) {
-      fields.push(
-        fieldRow(
-          "",
-          el(
-            "button",
-            {
-              class: "btn",
-              onclick: function () {
-                draft.images.push({ src: "", alt: "", match: "" });
-                markDirty();
-                rerenderEditor();
-              },
-            },
-            [el("span", { html: ICONS.plus }), el("span", { text: "Dodaj sliku" })]
-          ),
-          "Galerija moze da ima koliko god slika treba — tri, deset, svejedno."
-        )
-      );
+    // Slike preko Framer-ovih sest. Nastavljaju numeraciju (Image 7, 8, …) i
+    // ponasaju se isto, samo ih na stranicu dodaje assets/legacy-gallery.js.
+    if (isLegacy) {
+      draft.extraImages.forEach(function (image, index) {
+        fields.push(
+          fieldRow(
+            "Image " + (LEGACY_IMAGE_SLOTS + index + 1),
+            mediaSlot(image, "image", function () {
+              draft.extraImages.splice(index, 1);
+              markDirty();
+              rerenderEditor();
+            })
+          )
+        );
+      });
     }
+
+    fields.push(
+      fieldRow(
+        "",
+        el(
+          "button",
+          {
+            class: "btn",
+            onclick: function () {
+              (isLegacy ? draft.extraImages : draft.images).push({ src: "", alt: "", match: "" });
+              markDirty();
+              rerenderEditor();
+            },
+          },
+          [el("span", { html: ICONS.plus }), el("span", { text: "Dodaj sliku" })]
+        ),
+        isLegacy
+          ? "Galerija moze da ima koliko god slika treba. Prvih sest su Framer-ova polja; sve preko toga dodaje sajt sam pri ucitavanju stranice."
+          : "Galerija moze da ima koliko god slika treba — tri, deset, svejedno."
+      )
+    );
 
     fields.push(fieldRow("video", mediaSlot(draft.video, "video")));
 
@@ -1755,11 +1780,17 @@
   /* --------------------------------------------------------------- write */
 
   function stagedFilesFor(item) {
-    var used = [item.thumb && item.thumb.src, item.video && item.video.src].concat(
-      item.images.map(function (image) {
-        return image.src;
-      })
-    );
+    var used = [item.thumb && item.thumb.src, item.video && item.video.src]
+      .concat(
+        item.images.map(function (image) {
+          return image.src;
+        })
+      )
+      .concat(
+        (item.extraImages || []).map(function (image) {
+          return image.src;
+        })
+      );
     var files = [];
     used.forEach(function (src) {
       var staged = state.staged[src];
@@ -1818,6 +1849,24 @@
     return html;
   }
 
+  // Spisak dodatnih slika koji cita assets/legacy-gallery.js. `gallery` su
+  // hasevi Framer-ovih sest slika — po njima skript pronalazi galeriju u DOM-u
+  // posle hidracije, bez oslanjanja na Framer klase koje se menjaju exportom.
+  function writeExtraBlock(html, known, images) {
+    var json = JSON.stringify({ gallery: known, images: images });
+    var re = /(<script type="application\/json" id="cms-extra-media">)([\s\S]*?)(<\/script>)/;
+
+    if (re.test(html)) {
+      return html.replace(re, function (all, open, body, close) {
+        return open + json + close;
+      });
+    }
+    return html.replace(
+      "</body>",
+      '<script type="application/json" id="cms-extra-media">' + json + "</script>\n</body>"
+    );
+  }
+
   function updatedManifest(draft) {
     var manifest = JSON.parse(JSON.stringify(state.legacyManifest || {}));
     var entry = manifest[draft.slug] || { thumb: null, images: [], video: null };
@@ -1841,8 +1890,24 @@
           src: draft.video.src }
       : null;
 
+    entry.extra = cleanExtras(draft);
+
     manifest[draft.slug] = entry;
     return manifest;
+  }
+
+  function cleanExtras(draft) {
+    return (draft.extraImages || [])
+      .filter(function (image) {
+        return image.src;
+      })
+      .map(function (image) {
+        return { src: image.src, alt: image.alt || "" };
+      });
+  }
+
+  function extrasChanged(draft) {
+    return JSON.stringify(cleanExtras(draft)) !== JSON.stringify(cleanExtras(state.original));
   }
 
   function publishDraft() {
@@ -2058,7 +2123,9 @@
     });
 
     var pairs = changedSlots(draft, state.original);
-    if (!pairs.length) {
+    var extrasDirty = extrasChanged(draft);
+
+    if (!pairs.length && !extrasDirty) {
       return Promise.resolve({ message: "CMS: izmena kartice " + draft.title, files: files });
     }
 
@@ -2073,18 +2140,25 @@
         return state.store.readFile(path);
       })
     ).then(function (contents) {
+      var pageFile = "work/" + draft.slug + "/index.html";
+
       contents.forEach(function (content, index) {
         if (content === null) return;
         var next = rewriteHtml(content, pairs);
+        // Spisak dodatnih slika stoji samo u stranici samog projekta.
+        if (sources[index] === pageFile) {
+          next = writeExtraBlock(next, draft.knownGallery || [], cleanExtras(draft));
+        }
         if (next !== content) {
           files.push({ path: sources[index], base64: b64encode(next) });
         }
       });
 
-      return {
-        message: "CMS: " + draft.title + " — zamena " + pairs.length + " slike/slika",
-        files: files,
-      };
+      var what = [];
+      if (pairs.length) what.push("zamena " + pairs.length + " slike/slika");
+      if (extrasDirty) what.push(cleanExtras(draft).length + " dodatnih slika");
+
+      return { message: "CMS: " + draft.title + " — " + what.join(", "), files: files };
     });
   }
 

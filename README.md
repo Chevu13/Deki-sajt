@@ -19,6 +19,7 @@ assets/images, fonts, videos   Mediji (Framer export)
 assets/animate                 Framer/Motion runtime (samo za Framer stranice)
 assets/uploads                 Slike/video koje CMS panel upload-uje
 assets/cms.css, cms.js         Stilovi/JS za CMS-generisane stranice (bez Framer JS-a)
+assets/legacy-gallery.js       Dodaje slike preko Framer-ovih sest u 6 originalnih stranica
 
 content/work/*.md              Podaci za nove projekte (izvor za CMS panel)
 content/legacy-work.json       Podaci za originalnih 6 projekata (za work listu)
@@ -64,15 +65,16 @@ slika, izmenjen sadržaj i ažurirane mape idu zajedno (Git Data API), pa Vercel
 pravi jedan build umesto jednog po fajlu.
 
 Editor ima ista polja za obe vrste projekata: Title, Status, Slug, Details
-(Overview, Project Overview, Year, Service 1–3, Live Link) i Images
-(**Thumb, Image 1–6, video**).
+(Overview, Project Overview, Year, Service 1–3, Live Link) i Images (Thumb,
+Image 1, 2, 3…, video). **Broj slika u galeriji nije ogranicen** — ni kod novih
+projekata ni kod originalnih 6 — vidi nize.
 
 Panel ima dve kolekcije u sidebaru:
 
 | Kolekcija | Stavke | Izvor | Šta se menja |
 |---|---|---|---|
 | **Work Items** | CMS projekti | `content/work/*.md` | sve; `scripts/build.mjs` iz njih generiše `work/<slug>/index.html` |
-| **Work Items** | Framer projekti (originalnih 6) | `content/legacy-work.json` + sam HTML | kartica na `/work`, **sve slike i video u stranici**, Status, brisanje |
+| **Work Items** | Framer projekti (originalnih 6) | `content/legacy-work.json` + sam HTML | kartica na `/work`, **sve slike i video u stranici + dodatne preko sest**, Status, brisanje |
 | **Pages** | Home, About | `content/pages.json` + sam HTML | Home: hero slika i tekst ispod hero banera. About: tri slike u sekciji |
 
 ### Kako se menja sadržaj statičkih Framer stranica
@@ -104,6 +106,28 @@ gde tekst stoji u template literalu.
 
 Kad se zameni Thumb nekog od 6 projekata, prepisuje se i `index.html` — naslovna
 prikazuje thumbove izabranih radova, pa bi inače ostala sa starom slikom.
+
+### Dodatne slike u galerijama originalnih 6
+
+Framer komponenta tih stranica ima **tačno sedam imenovanih polja za sliku**
+(hero + šest) — vidi `__framer__handoverData` u samoj stranici, to je CMS upit
+sa poljima `WZLjnByVm`, `gKZf9vCAz`, … Sedmo polje ne postoji, pa se sedma slika
+ne može dodati ni kroz HTML ni kroz payload: React posle hidracije prezida
+galeriju iz svojih propova i svaki dodat markup nestane (provereno).
+
+Zato slike preko šeste dodaje [assets/legacy-gallery.js](assets/legacy-gallery.js)
+**posle hidracije**: klonira postojeći slajd (da razmak i dimenzije budu
+identični), zameni sliku u njemu i doda ga na kraj. Skript je otporan na to da
+React prezida listu — poredi broj slajdova i vraća dodate ako nestanu.
+
+Spisak stoji u samoj stranici, u `<script id="cms-extra-media">`, i piše ga CMS
+panel. Galerija se u DOM-u pronalazi po hash imenima Framer-ovih šest slika, ne
+po Framer klasama — te se menjaju sa svakim exportom.
+
+Jedina razlika u odnosu na originalne slajdove: Framer svoje otkriva scroll
+animacijom sticky sekcije, na koju se spolja ne može zakačiti, pa se dodate
+prikazuju kratkim fade-om umesto scroll-sinhronizovanim. Sve ostalo — položaj,
+dimenzije, razmak, lazy loading, dužina scroll-a — isto je.
 
 Raspored, tipografija i animacije tih stranica i dalje dolaze iz Framer export-a
 i panel ih ne dira — kao ni Contact/Privacy Policy/404.

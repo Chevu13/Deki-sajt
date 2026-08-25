@@ -40,7 +40,8 @@
     "video": null,
     "sources": [
       "work/cro-sea-villas/index.html"
-    ]
+    ],
+    "extra": []
   },
   "falco-gin": {
     "thumb": {
@@ -83,7 +84,8 @@
     "video": null,
     "sources": [
       "work/falco-gin/index.html"
-    ]
+    ],
+    "extra": []
   },
   "adria-design-biennale": {
     "thumb": {
@@ -129,7 +131,8 @@
     },
     "sources": [
       "work/adria-design-biennale/index.html"
-    ]
+    ],
+    "extra": []
   },
   "pletho": {
     "thumb": {
@@ -172,7 +175,8 @@
     "video": null,
     "sources": [
       "work/pletho/index.html"
-    ]
+    ],
+    "extra": []
   },
   "nordarch-studio": {
     "thumb": {
@@ -215,7 +219,8 @@
     "video": null,
     "sources": [
       "work/nordarch-studio/index.html"
-    ]
+    ],
+    "extra": []
   },
   "vellor-residency": {
     "thumb": {
@@ -261,6 +266,7 @@
     },
     "sources": [
       "work/vellor-residency/index.html"
-    ]
+    ],
+    "extra": []
   }
 }

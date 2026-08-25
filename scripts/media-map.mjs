@@ -85,6 +85,50 @@ function findSources(baseFile, tokens) {
   return sources;
 }
 
+// Dodatne slike se ne mogu ubaciti u Framer galeriju ni kroz HTML ni kroz
+// payload (komponenta ima tacno sedam imenovanih polja za sliku), pa ih
+// assets/legacy-gallery.js dodaje posle hidracije. Ovde se u stranicu jednom
+// ubacuje taj skript i prazan blok sa podacima koji panel kasnije popunjava.
+const EXTRA_BLOCK_ID = "cms-extra-media";
+const EXTRA_SCRIPT = '<script src="/assets/legacy-gallery.js" defer></script>';
+
+function extraBlock(known, images) {
+  return (
+    '<script type="application/json" id="' + EXTRA_BLOCK_ID + '">' +
+    JSON.stringify({ gallery: known, images: images || [] }) +
+    "</script>"
+  );
+}
+
+function ensureExtraHooks(file, known) {
+  const full = path.join(ROOT, file);
+  let html = fs.readFileSync(full, "utf8");
+  const before = html;
+
+  // Sacuvaj vec upisane dodatne slike ako blok postoji.
+  let existing = [];
+  const found = new RegExp(
+    '<script type="application/json" id="' + EXTRA_BLOCK_ID + '">([\\s\\S]*?)</script>'
+  ).exec(html);
+  if (found) {
+    try {
+      existing = JSON.parse(found[1]).images || [];
+    } catch (err) {
+      console.warn(`  upozorenje: neispravan ${EXTRA_BLOCK_ID} u ${file}`);
+    }
+    html = html.replace(found[0], extraBlock(known, existing));
+  } else {
+    html = html.replace("</body>", extraBlock(known, existing) + "\n</body>");
+  }
+
+  if (!html.includes("/assets/legacy-gallery.js")) {
+    html = html.replace("</body>", EXTRA_SCRIPT + "\n</body>");
+  }
+
+  if (html !== before) fs.writeFileSync(full, html, "utf8");
+  return existing;
+}
+
 function buildLegacy() {
   const legacy = JSON.parse(fs.readFileSync(LEGACY_FILE, "utf8"));
   const manifest = {};
@@ -115,9 +159,14 @@ function buildLegacy() {
       ),
     };
 
+    const known = gallery.slice(0, GALLERY_SLOTS).map((slot) => slot.match);
+    const extras = ensureExtraHooks(`work/${project.slug}/index.html`, known);
+    manifest[project.slug].extra = extras;
+
     console.log(
       `${project.slug}: thumb + ${Math.min(gallery.length, GALLERY_SLOTS)} slika` +
         (video ? " + video" : "") +
+        (extras.length ? ` + ${extras.length} dodatnih` : "") +
         `, ${manifest[project.slug].sources.length} izvor(a)`
     );
   }
