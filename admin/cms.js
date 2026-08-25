@@ -441,7 +441,13 @@
       status: row.status === "Draft" ? "Draft" : "Live",
       year: row.year === 0 || row.year ? String(row.year) : "",
       overview: row.overview || "",
-      projectOverview: "",
+      // Duzi case-study tekst stoji u samoj Framer stranici (polje qHx5bRsBk u
+      // handover payloadu), pa se menja prepisom izvora kao i ostali tekstovi.
+      texts: ((manifest && manifest.texts) || []).map(function (text) {
+        return { key: text.key, label: text.label, value: text.value, rows: text.rows || 6 };
+      }),
+      projectOverview:
+        (manifest && manifest.texts && manifest.texts[0] && manifest.texts[0].value) || "",
       liveLink: "",
       services: [],
       cardImage: row.hero_image || "",
@@ -451,9 +457,6 @@
       // posle hidracije, iz JSON bloka u samoj stranici.
       extraImages: ((manifest && manifest.extra) || []).map(function (image) {
         return { src: image.src, alt: image.alt || "" };
-      }),
-      knownGallery: images.map(function (image) {
-        return image.match;
       }),
       video: (manifest && manifest.video) || { src: "", match: "" },
       sources:
@@ -1447,7 +1450,28 @@
       )
     );
 
-    if (!isLegacy) {
+    // Kod CMS projekata tekst zivi u Markdownu; kod originalnih 6 u samoj
+    // Framer stranici, pa se drzi u draft.texts i pise prepisom izvora.
+    if (isLegacy) {
+      draft.texts.forEach(function (text) {
+        fields.push(
+          fieldRow(
+            text.label,
+            el("textarea", {
+              class: "textarea",
+              rows: text.rows,
+              value: text.value,
+              oninput: function (event) {
+                text.value = event.target.value;
+                draft.projectOverview = event.target.value;
+                markDirty();
+              },
+            }),
+            "Duzi case-study tekst na stranici projekta."
+          )
+        );
+      });
+    } else {
       fields.push(
         fieldRow(
           "Project Overview",
@@ -1891,9 +1915,26 @@
       : null;
 
     entry.extra = cleanExtras(draft);
+    entry.texts = (draft.texts || []).map(function (text) {
+      return { key: text.key, label: text.label, value: text.value, rows: text.rows };
+    });
 
     manifest[draft.slug] = entry;
     return manifest;
+  }
+
+  // Po cemu assets/legacy-gallery.js prepoznaje galeriju u DOM-u posle
+  // hidracije. Mora da bude stanje POSLE ove izmene: ako je slot upravo
+  // zamenjen uploadom, stari Framer hash vise ne postoji na stranici i skript
+  // ne bi nasao galeriju.
+  function galleryMatches(draft) {
+    return draft.images
+      .map(function (image, index) {
+        var before = state.original.images[index] || {};
+        if (!image.src) return "";
+        return image.src === before.src ? before.match || image.src : image.src;
+      })
+      .filter(Boolean);
   }
 
   function cleanExtras(draft) {
@@ -1977,24 +2018,60 @@
 
   // Isti tekst stoji u dva oblika: u telu HTML-a i u template literalu unutar
   // page chunk-a. Escape zavisi od toga u koji fajl se upisuje.
-  function escapeForFile(text, path) {
+  // Isti tekst stoji na vise mesta i u razlicitom kontekstu, pa escape ne moze
+  // biti isti svuda:
+  //
+  //   html  telo stranice            -> HTML entiteti
+  //   json  __framer__handoverData   -> JSON escape; entiteti bi se ovde
+  //                                    prikazali doslovno ("&amp;"), jer React
+  //                                    renderuje payload kao obican tekst
+  //   mjs   page chunk               -> template literal
+  function escapeFor(text, context) {
     var value = String(text);
-    if (/\.mjs$/i.test(path)) {
-      // JS template literal — backslash, backtick i pocetak interpolacije.
-      return value
-        .replace(/\\/g, "\\\\")
-        .replace(/`/g, "\\`")
-        .replace(/\$\{/g, "\\${");
+    if (context === "mjs") {
+      return value.replace(/\\/g, "\\\\").replace(/`/g, "\\`").replace(/\$\{/g, "\\${");
     }
-    // Telo HTML-a; navodnici su bezbedni jer ovo nije vrednost atributa.
+    if (context === "json") {
+      return JSON.stringify(value).slice(1, -1);
+    }
+    // Navodnici su bezbedni jer ovo nije vrednost atributa.
     return value.replace(/&/g, "&amp;").replace(/</g, "&lt;").replace(/>/g, "&gt;");
   }
 
+  var HANDOVER = /<script\b[^>]*id="__framer__handoverData"[^>]*>[\s\S]*?<\/script>/i;
+
+  function replaceText(content, pair, context) {
+    if (content.indexOf(pair.from) < 0) return content;
+    return content.split(pair.from).join(escapeFor(pair.to, context));
+  }
+
   function applyReplacements(content, imagePairs, textPairs, path) {
+    var isJs = /\.mjs$/i.test(path);
+
     textPairs.forEach(function (pair) {
       if (content.indexOf(pair.from) < 0) return;
-      content = content.split(pair.from).join(escapeForFile(pair.to, path));
+
+      if (isJs) {
+        content = replaceText(content, pair, "mjs");
+        return;
+      }
+
+      // U HTML-u se payload odvaja i menja po svojim pravilima; ostatak
+      // stranice po HTML pravilima.
+      var payload = HANDOVER.exec(content);
+      if (!payload) {
+        content = replaceText(content, pair, "html");
+        return;
+      }
+
+      var head = content.slice(0, payload.index);
+      var tail = content.slice(payload.index + payload[0].length);
+      content =
+        replaceText(head, pair, "html") +
+        replaceText(payload[0], pair, "json") +
+        replaceText(tail, pair, "html");
     });
+
     return rewriteHtml(content, imagePairs);
   }
 
@@ -2125,7 +2202,15 @@
     var pairs = changedSlots(draft, state.original);
     var extrasDirty = extrasChanged(draft);
 
-    if (!pairs.length && !extrasDirty) {
+    var textPairs = [];
+    (draft.texts || []).forEach(function (text, index) {
+      var before = (state.original.texts || [])[index];
+      if (before && text.value !== before.value) {
+        textPairs.push({ from: before.value, to: text.value });
+      }
+    });
+
+    if (!pairs.length && !extrasDirty && !textPairs.length) {
       return Promise.resolve({ message: "CMS: izmena kartice " + draft.title, files: files });
     }
 
@@ -2142,12 +2227,27 @@
     ).then(function (contents) {
       var pageFile = "work/" + draft.slug + "/index.html";
 
+      // Tekst stoji i u telu stranice i u handover payloadu iz kog React
+      // hidrira — zamenjuju se sva pojavljivanja, pa provera trazi da je tekst
+      // pronadjen bar negde, a ne tacno jednom.
+      var textHits = 0;
+      textPairs.forEach(function (pair) {
+        contents.forEach(function (content) {
+          if (content) textHits += content.split(pair.from).length - 1;
+        });
+      });
+      if (textPairs.length && !textHits) {
+        throw new Error(
+          "Stari tekst nije pronadjen u stranici. Pokreni `npm run media-map` da se mapa osvezi."
+        );
+      }
+
       contents.forEach(function (content, index) {
         if (content === null) return;
-        var next = rewriteHtml(content, pairs);
+        var next = applyReplacements(content, pairs, textPairs, sources[index]);
         // Spisak dodatnih slika stoji samo u stranici samog projekta.
         if (sources[index] === pageFile) {
-          next = writeExtraBlock(next, draft.knownGallery || [], cleanExtras(draft));
+          next = writeExtraBlock(next, galleryMatches(draft), cleanExtras(draft));
         }
         if (next !== content) {
           files.push({ path: sources[index], base64: b64encode(next) });
@@ -2157,6 +2257,7 @@
       var what = [];
       if (pairs.length) what.push("zamena " + pairs.length + " slike/slika");
       if (extrasDirty) what.push(cleanExtras(draft).length + " dodatnih slika");
+      if (textPairs.length) what.push("tekst");
 
       return { message: "CMS: " + draft.title + " — " + what.join(", "), files: files };
     });

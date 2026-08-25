@@ -74,7 +74,7 @@ Panel ima dve kolekcije u sidebaru:
 | Kolekcija | Stavke | Izvor | Šta se menja |
 |---|---|---|---|
 | **Work Items** | CMS projekti | `content/work/*.md` | sve; `scripts/build.mjs` iz njih generiše `work/<slug>/index.html` |
-| **Work Items** | Framer projekti (originalnih 6) | `content/legacy-work.json` + sam HTML | kartica na `/work`, **sve slike i video u stranici + dodatne preko sest**, Status, brisanje |
+| **Work Items** | Framer projekti (originalnih 6) | `content/legacy-work.json` + sam HTML | kartica na `/work`, **Project Overview**, sve slike i video u stranici **+ dodatne preko šest**, Status, brisanje |
 | **Pages** | Home, About | `content/pages.json` + sam HTML | Home: hero slika i tekst ispod hero banera. About: tri slike u sekciji |
 
 ### Kako se menja sadržaj statičkih Framer stranica
@@ -86,7 +86,8 @@ sadržaj tako što prepiše same izvorne fajlove, isto što radi i
 Mape "šta stoji gde" pravi `npm run media-map`:
 
 ```
-content/legacy-images.json   6 project stranica: Thumb, Image 1–6, video
+content/legacy-images.json   6 project stranica: Project Overview, Thumb,
+                             Image 1–6 (+ dodatne), video
 content/pages.json           Home i About: slike + tekst
 ```
 
@@ -95,14 +96,21 @@ hidracije vrati staro stanje:
 
 1. `srcset` lista (više veličina iste slike)
 2. `src` atribut
-3. **JSON payload** koji Framer ugrađuje u stranicu za hidraciju
+3. **JSON payload** (`__framer__handoverData`) iz kog React hidrira
 4. **page chunk** u `assets/animate/*.mjs` — Home i About renderuju hero sliku i
    tekst odatle, ne iz HTML-a
 
+Tekst se escape-uje **po kontekstu, ne po fajlu** — isti pasus zna da stoji na
+dva mesta u istom fajlu:
+
+| Gde | Escape |
+|---|---|
+| telo HTML-a | HTML entiteti |
+| `__framer__handoverData` | JSON escape — entiteti bi se ovde videli doslovno (`&amp;`), jer React renderuje payload kao običan tekst |
+| `assets/animate/*.mjs` | template literal (backslash, backtick, `${`) |
+
 Zato svaka stavka u mapi nosi i listu `sources`. Project stranice imaju samo
-svoj HTML; Home i About imaju i po jedan `.mjs` chunk. Tekst se escape-uje po
-tipu fajla — HTML entiteti u `.html`, a backslash / backtick / `${` u `.mjs`,
-gde tekst stoji u template literalu.
+svoj HTML; Home i About imaju i po jedan `.mjs` chunk.
 
 Kad se zameni Thumb nekog od 6 projekata, prepisuje se i `index.html` — naslovna
 prikazuje thumbove izabranih radova, pa bi inače ostala sa starom slikom.

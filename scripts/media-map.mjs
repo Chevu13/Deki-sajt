@@ -43,19 +43,33 @@ function readHtml(file) {
 // Slike redosledom pojavljivanja. Framer renderuje odvojene desktop/mobile
 // varijante iste sekcije, pa se ista slika javlja vise puta — dedupira se uz
 // cuvanje redosleda.
+// Slika je ili Framer-ova optimizovana (vise velicina istog hasa, pa je `match`
+// hash bez sufiksa) ili fajl koji je panel upload-ovao (jedna velicina, `match`
+// je puna putanja). Kad se Framer slika zameni uploadom, u stranici ostaje samo
+// ovaj drugi oblik — zato se moraju prepoznavati oba.
+function imageRef(tag) {
+  const opt = /\ssrc="(\/assets\/images\/opt\/(image-[a-f0-9]+)-\d+\.webp)"/.exec(tag);
+  if (opt) return { src: opt[1], match: opt[2] };
+
+  const uploaded = /\ssrc="(\/assets\/uploads\/[^"]+)"/.exec(tag);
+  if (uploaded) return { src: uploaded[1], match: uploaded[1] };
+
+  return null;
+}
+
 function orderedImages(html, skip) {
   const tags = html.match(/<img\b[^>]*>/g) || [];
   const seen = new Set();
   const out = [];
 
   for (const tag of tags) {
-    const src = /\ssrc="(\/assets\/images\/opt\/(image-[a-f0-9]+)-\d+\.webp)"/.exec(tag);
-    if (!src) continue;
-    const base = src[2];
-    if (CHROME_IMAGES.has(base) || seen.has(base) || (skip && skip.has(base))) continue;
-    seen.add(base);
+    const ref = imageRef(tag);
+    if (!ref) continue;
+    if (CHROME_IMAGES.has(ref.match) || seen.has(ref.match)) continue;
+    if (skip && skip.has(ref.match)) continue;
+    seen.add(ref.match);
     const alt = /\salt="([^"]*)"/.exec(tag);
-    out.push({ match: base, src: src[1], alt: alt ? alt[1] : "" });
+    out.push({ match: ref.match, src: ref.src, alt: alt ? alt[1] : "" });
   }
   return out;
 }
@@ -129,6 +143,36 @@ function ensureExtraHooks(file, known) {
   return existing;
 }
 
+// Duzi case-study tekst ("OVERVIEW" na stranici projekta) je polje qHx5bRsBk u
+// Framer CMS kolekciji. Cita se iz __framer__handoverData umesto pogadjanjem
+// "najduzeg teksta", jer na stranici ima i drugih dugackih pasusa.
+const PROJECT_OVERVIEW_FIELD = "qHx5bRsBk";
+
+function projectOverview(html) {
+  const script = /<script\b[^>]*id="__framer__handoverData"[^>]*>([\s\S]*?)<\/script>/i.exec(html);
+  if (!script) return null;
+
+  let table;
+  try {
+    table = JSON.parse(script[1]);
+  } catch (err) {
+    return null;
+  }
+
+  const record = table.find(
+    (entry) =>
+      entry && typeof entry === "object" && !Array.isArray(entry) && PROJECT_OVERVIEW_FIELD in entry
+  );
+  if (!record) return null;
+
+  // Vrednost polja je indeks u istu tabelu, a tamo stoji omotac {type, value}
+  // ciji je `value` opet indeks — tek on nosi sam tekst.
+  let value = table[record[PROJECT_OVERVIEW_FIELD]];
+  if (value && typeof value === "object" && "value" in value) value = table[value.value];
+
+  return typeof value === "string" && value.trim() ? value : null;
+}
+
 function buildLegacy() {
   const legacy = JSON.parse(fs.readFileSync(LEGACY_FILE, "utf8"));
   const manifest = {};
@@ -162,6 +206,12 @@ function buildLegacy() {
     const known = gallery.slice(0, GALLERY_SLOTS).map((slot) => slot.match);
     const extras = ensureExtraHooks(`work/${project.slug}/index.html`, known);
     manifest[project.slug].extra = extras;
+
+    const overview = projectOverview(html);
+    manifest[project.slug].texts = overview
+      ? [{ key: "project_overview", label: "Project Overview", value: overview, rows: 6 }]
+      : [];
+    if (!overview) console.warn(`  upozorenje: ${project.slug} — nema Project Overview u payloadu`);
 
     console.log(
       `${project.slug}: thumb + ${Math.min(gallery.length, GALLERY_SLOTS)} slika` +
