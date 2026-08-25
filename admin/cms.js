@@ -710,9 +710,20 @@
     return null;
   }
 
+  // Sta panel prikazuje kao pregled slike.
+  //
+  // Fajl koji ceka Publish ima svoj data URL u memoriji. Vec upload-ovan fajl
+  // se cita sa GitHub-a, a ne sa sajta: na sajtu ga nema dok Vercel ne zavrsi
+  // build, pa bi posle objave pregled bio prazan nekoliko minuta. Slike iz
+  // Framer export-a se ne menjaju i idu sa sajta, gde su kesirane.
   function displaySrc(src) {
     var staged = state.staged[src];
-    return staged ? staged.previewUrl : src;
+    if (staged) return staged.previewUrl;
+
+    if (!DEMO && src && src.indexOf(CFG.publicFolder + "/") === 0) {
+      return "https://raw.githubusercontent.com/" + CFG.repo + "/" + CFG.branch + src;
+    }
+    return src;
   }
 
   /* -------------------------------------------------------------- render */
@@ -1835,7 +1846,9 @@
     var files = [];
     used.forEach(function (src) {
       var staged = state.staged[src];
-      if (!staged) return;
+      // `committed` fajlovi ostaju u state.staged zbog pregleda iz memorije,
+      // ali se ne salju ponovo pri sledecem Publish-u.
+      if (!staged || staged.committed) return;
       var already = files.some(function (file) {
         return file.path === staged.repoPath;
       });
@@ -1968,6 +1981,72 @@
     return JSON.stringify(cleanExtras(draft)) !== JSON.stringify(cleanExtras(state.original));
   }
 
+  // Prepisuje stavku u state.items onim sto je upravo commit-ovano i azurira
+  // mape, tako da panel odmah pokazuje novo stanje bez citanja sa GitHub-a.
+  function commitDraftLocally(draft) {
+    var key =
+      draft.kind === "page"
+        ? "page:" + draft.id
+        : draft.kind === "legacy"
+        ? "legacy:" + draft.slug
+        : "cms:" + (draft.file || CFG.contentDir + "/" + draft.slug + ".md");
+
+    var saved = JSON.parse(JSON.stringify(draft));
+    saved.key = key;
+    saved.isNew = false;
+    if (saved.kind === "cms" && !saved.file) {
+      saved.file = CFG.contentDir + "/" + saved.slug + ".md";
+    }
+
+    var replaced = false;
+    state.items = state.items.map(function (item) {
+      if (item.key !== draft.key && item.key !== key) return item;
+      replaced = true;
+      return saved;
+    });
+    if (!replaced) state.items.push(saved);
+    state.selectedKey = key;
+
+    if (saved.kind === "legacy") {
+      // updatedManifest poredi sa state.original, koji je jos pre-publish
+      // stanje — zato se zove pre nego sto se original resetuje.
+      var manifest = updatedManifest(saved);
+      state.legacyManifest = manifest;
+
+      var entry = manifest[saved.slug] || {};
+      if (saved.thumb && entry.thumb) saved.thumb.match = entry.thumb.match;
+      (entry.images || []).forEach(function (image, index) {
+        if (saved.images[index]) saved.images[index].match = image.match;
+      });
+      if (saved.video && entry.video) saved.video.match = entry.video.match;
+    } else if (saved.kind === "page") {
+      var pages = JSON.parse(JSON.stringify(state.pagesManifest || {}));
+      var page = pages[saved.id] || {};
+
+      page.images = saved.images.map(function (image, index) {
+        var before = (state.original.images || [])[index] || {};
+        // Zamenjena slika od sada se prepoznaje po svojoj novoj putanji.
+        image.match = image.src === before.src ? before.match || image.src : image.src;
+        return { key: image.key, label: image.label, match: image.match, src: image.src };
+      });
+      page.texts = saved.texts.map(function (text) {
+        return { key: text.key, label: text.label, value: text.value, rows: text.rows };
+      });
+
+      pages[saved.id] = page;
+      state.pagesManifest = pages;
+    }
+  }
+
+  function padDraftSlots() {
+    var draft = state.draft;
+    if (!draft) return;
+    while (draft.kind === "cms" && draft.services.length < 3) draft.services.push("");
+    if (draft.kind === "cms" && !draft.images.length) {
+      draft.images.push({ src: "", alt: "", match: "" });
+    }
+  }
+
   function publishDraft() {
     var draft = state.draft;
     if (!draft.title.trim()) {
@@ -1996,33 +2075,33 @@
         return state.store.commit(payload.message, payload.files);
       })
       .then(function () {
-        return state.store.load();
-      })
-      .then(function (items) {
-        state.items = items;
-        state.staged = {};
+        // Namerno se NE cita ponovo sa GitHub-a. Dva razloga:
+        //
+        //   1. GitHub API je eventually consistent — odmah posle commit-a GET
+        //      jos vraca prethodni sadrzaj, pa bi se projekat otvorio sa
+        //      starim slikama dok se panel ne osvezi rucno.
+        //   2. Nove slike se u panelu prikazuju preko /assets/uploads/..., a
+        //      tamo ih nema dok Vercel ne zavrsi build.
+        //
+        // Stanje posle commit-a je vec poznato — to je upravo ono sto je
+        // upisano — pa se primenjuje lokalno. state.staged se ne prazni da bi
+        // pregled i dalje isao iz memorije, bez cekanja deploy-a.
+        Object.keys(state.staged).forEach(function (path) {
+          state.staged[path].committed = true;
+        });
+        commitDraftLocally(draft);
+
         state.saving = false;
         state.dirty = false;
-        var key =
-          draft.kind === "page"
-            ? "page:" + draft.id
-            : draft.kind === "legacy"
-            ? "legacy:" + draft.slug
-            : "cms:" + (draft.file || CFG.contentDir + "/" + draft.slug + ".md");
-        var refreshed = findItem(key);
-        if (refreshed) {
-          state.selectedKey = refreshed.key;
-          state.draft = JSON.parse(JSON.stringify(refreshed));
-          state.original = JSON.parse(JSON.stringify(refreshed));
-        } else {
-          state.view = "list";
-          state.draft = null;
-        }
+        state.draft = JSON.parse(JSON.stringify(findItem(state.selectedKey) || draft));
+        state.original = JSON.parse(JSON.stringify(state.draft));
+        padDraftSlots();
+
         render();
         toast(
           DEMO
             ? "Demo: izmena nije sacuvana."
-            : "Sacuvano u jednom commit-u. Vercel gradi sajt — za par minuta je uzivo."
+            : "Sacuvano. Panel vec prikazuje novo stanje; sajt je uzivo za par minuta."
         );
       })
       .catch(function (err) {
@@ -2410,10 +2489,16 @@
     state.store
       .commit("CMS: brisanje projekta " + item.title, files)
       .then(function () {
-        return state.store.load();
-      })
-      .then(function (items) {
-        state.items = items;
+        // Kao i kod Publish-a: stanje je poznato, pa se ne cita ponovo sa
+        // GitHub-a koji odmah posle commit-a jos vraca staro.
+        state.items = state.items.filter(function (row) {
+          return row.key !== item.key;
+        });
+        if (item.kind === "legacy") {
+          var manifest = JSON.parse(JSON.stringify(state.legacyManifest || {}));
+          delete manifest[item.slug];
+          state.legacyManifest = manifest;
+        }
         state.view = "list";
         state.draft = null;
         state.original = null;
