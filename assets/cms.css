@@ -1,7 +1,10 @@
-/* Hand-written styles for CMS-generated work pages.
-   Reuses the site's existing color tokens/fonts (loaded via the shared
-   Framer style blocks in <head>) but with plain, dependency-free CSS —
-   no Framer runtime required for these rules to apply. */
+/* Stilovi za stranice koje generise scripts/build.mjs (/work i /work/<slug>).
+   Framer CSS se na ovim stranicama ucitava (font-face + tokeni iz <head>), ali
+   se Framer runtime ne pokrece — pa je raspored ovde napisan rucno.
+
+   Sve mere su prepisane sa https://dtumenko.framer.website, izmerene u browseru
+   na vise sirina (400 / 900 / 1300 / 1600), da bi CMS stranice stajale isto kao
+   one koje je Framer izvezao. Framer prelomne tacke: 810px i 1200px. */
 
 /* Navigacija je providna i stoji preko sadrzaja, pa pozadina mora na <body>:
    inace je traka iznad .cms-main bela. */
@@ -12,167 +15,352 @@ body {
 
 .cms-main {
   background: rgb(15, 15, 15);
-  color: #eee;
-  padding-top: 96px;
+  color: rgb(238, 238, 238);
 }
 
+/* Framer navigaciju drzi preko sadrzaja (position: fixed), ali to postavlja
+   njegov runtime — a on se ovde ne ucitava. Bez ovoga bi traka stajala u toku
+   i gurala stranicu 68px nize, pa hero ne bi pocinjao od vrha ekrana. */
+.cms-nav {
+  position: fixed;
+  top: 0;
+  left: 0;
+  right: 0;
+  z-index: 10;
+}
+
+/* ---------------------------------------------------------------- /work --- */
+
+/* Framer: root padding 128px 16px, razmak naslova i mreze 48px. */
+.cms-list {
+  display: flex;
+  flex-direction: column;
+  gap: 48px;
+  padding: 128px 16px;
+}
+
+.cms-list__title {
+  margin: 0;
+  font-family: "Inter Display", "Inter Display Placeholder", sans-serif;
+  font-size: 48px;
+  font-weight: 500;
+  line-height: 1.4;
+  color: rgb(238, 238, 238);
+}
+
+.cms-card-grid {
+  display: grid;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  gap: 16px;
+}
+
+/* Kartica projekta: slika je pozadina cele kartice (opacity .8 preko crne),
+   tekst stoji preko nje i vertikalno je centriran, strelica u donjem desnom
+   uglu. Visina je 708px na svakoj sirini — tako je i na Frameru. */
+.cms-card {
+  position: relative;
+  display: block;
+  height: 708px;
+  overflow: hidden;
+  background: rgb(0, 0, 0);
+  text-decoration: none;
+  color: inherit;
+}
+
+.cms-card__image {
+  position: absolute;
+  inset: 0;
+  opacity: 0.8;
+}
+
+.cms-card__image img {
+  width: 100%;
+  height: 100%;
+  object-fit: cover;
+  display: block;
+  transition: transform 0.6s ease;
+}
+
+.cms-card:hover .cms-card__image img {
+  transform: scale(1.04);
+}
+
+.cms-card__body {
+  position: relative;
+  z-index: 1;
+  display: flex;
+  flex-direction: column;
+  justify-content: center;
+  align-items: flex-start;
+  gap: 32px;
+  height: 100%;
+  padding: 16px;
+}
+
+.cms-card__meta {
+  display: flex;
+  flex-direction: column;
+  align-items: flex-start;
+  gap: 16px;
+}
+
+.cms-card__title {
+  margin: 0;
+  font-family: "Inter Display", "Inter Display Placeholder", sans-serif;
+  font-size: 32px;
+  font-weight: 500;
+  line-height: 1.4;
+  color: rgb(238, 238, 238);
+}
+
+.cms-card__year {
+  margin: 0;
+  font-family: "Inter Display", "Inter Display Placeholder", sans-serif;
+  font-size: 16px;
+  font-weight: 400;
+  line-height: 1.5;
+  color: rgb(238, 238, 238);
+}
+
+.cms-card__overview {
+  margin: 0;
+  font-family: "PT Mono", monospace;
+  font-size: 13px;
+  line-height: 1.2;
+  text-transform: uppercase;
+  color: rgb(238, 238, 238);
+}
+
+/* Strelica je isti fajl koji Framer koristi na naslovnoj, zarotirana za -45
+   stepeni da gleda u gornji desni ugao. */
+.cms-card__arrow {
+  position: absolute;
+  right: 16px;
+  bottom: 11px;
+  width: 48px;
+  height: 48px;
+  transform: rotate(-45deg);
+  pointer-events: none;
+}
+
+/* --------------------------------------------------- /work/<slug> — hero --- */
+
+/* Hero je visok kao ceo ekran, slika ide preko cele povrsine, a "View All" i
+   naslov stoje na sredini, uz levu ivicu. */
 .cms-hero {
-  max-width: 1200px;
-  margin: 0 auto;
-  padding: 24px;
+  position: relative;
+  display: flex;
+  flex-direction: column;
+  justify-content: center;
+  align-items: flex-start;
+  gap: 10px;
+  height: 100vh;
+  padding: 16px;
+  overflow: hidden;
+  background: rgb(0, 0, 0);
 }
 
-/* Na /work naslov ide uz ivicu, u ravni sa mrezom kartica. */
-.cms-hero--wide {
-  max-width: none;
-  padding: 24px 20px 0;
+/* Slika je na 80% preko crne — tako je i na Frameru, da bi tekst preko nje bio
+   citljiv bez zasebnog sloja za zatamnjenje. */
+.cms-hero__media {
+  position: absolute;
+  inset: 0;
+  z-index: 0;
+  opacity: 0.8;
+}
+
+.cms-hero__media img {
+  width: 100%;
+  height: 100%;
+  object-fit: cover;
+  display: block;
 }
 
 .cms-hero__back {
-  display: inline-block;
-  margin-bottom: 24px;
-  color: #fff;
+  position: relative;
+  z-index: 1;
+  padding: 4px 0;
+  font-family: "Switzer", "Switzer Placeholder", sans-serif;
+  font-size: 14px;
+  line-height: 1;
+  letter-spacing: -0.1px;
+  color: rgb(255, 255, 255);
   text-decoration: none;
   border-bottom: 1px solid rgb(247, 247, 247);
-  font-size: 14px;
 }
 
 .cms-hero__title {
-  margin: 0 0 24px;
-  font-family: "Inter Display", "Inter Display Placeholder", sans-serif;
-  font-size: clamp(32px, 6vw, 64px);
-  font-weight: 500;
-  line-height: 1.05;
-  color: #fff;
-}
-
-.cms-hero__image {
-  width: 100%;
-  aspect-ratio: 16 / 10;
-  border-radius: 4px;
-  overflow: hidden;
-  background: rgb(29, 29, 29);
-}
-
-.cms-hero__image img {
-  width: 100%;
-  height: 100%;
-  object-fit: cover;
-  display: block;
-}
-
-/* Gallery: pure CSS scroll-snap carousel, no JS required for core function */
-.cms-gallery {
-  max-width: 1200px;
-  margin: 32px auto 0;
-  padding: 0 24px;
-}
-
-.cms-gallery__track {
-  display: flex;
-  gap: 10px;
-  overflow-x: auto;
-  scroll-snap-type: x mandatory;
-  -webkit-overflow-scrolling: touch;
-  list-style: none;
+  position: relative;
+  z-index: 1;
   margin: 0;
-  padding: 0 0 8px;
-  scrollbar-width: thin;
+  font-family: "Inter Display", "Inter Display Placeholder", sans-serif;
+  font-size: 60px;
+  font-weight: 500;
+  line-height: 1.4;
+  color: rgb(238, 238, 238);
 }
 
-.cms-gallery__item {
-  flex-shrink: 0;
-  width: min(720px, 85vw);
-  aspect-ratio: 16 / 10;
-  scroll-snap-align: center;
-  border-radius: 4px;
+/* --------------------------------------------------- /work/<slug> — telo --- */
+
+/* Slike levo (70%), podaci desno (29%) — isti odnos kao na Frameru.
+   Razmak od heroja: 80 + 64 + 16 = 160px, isto kao na Frameru. */
+.cms-project {
+  display: grid;
+  grid-template-columns: minmax(0, 1fr) 29%;
+  gap: 16px;
+  padding: 160px 16px 128px;
+}
+
+.cms-project__media {
+  display: flex;
+  flex-direction: column;
+  gap: 16px;
+}
+
+/* Framer drzi visinu slike na 720px pri sirini kolone od 1087px; 3/2 pogadja
+   isti odnos, a za razliku od fiksne visine ostaje tacan i na uzem ekranu. */
+.cms-project__figure {
+  aspect-ratio: 3 / 2;
   overflow: hidden;
   background: rgb(29, 29, 29);
 }
 
-.cms-gallery__item img,
-.cms-gallery__item video {
+.cms-project__figure img,
+.cms-project__figure video {
   width: 100%;
   height: 100%;
   object-fit: cover;
   display: block;
 }
 
-.cms-gallery__nav {
+.cms-project__info {
   display: flex;
-  gap: 8px;
-  margin-top: 12px;
-}
-
-.cms-gallery__nav button {
-  width: 36px;
-  height: 36px;
-  border-radius: 50%;
-  border: 1px solid rgb(36, 36, 36);
-  background: rgb(29, 29, 29);
-  color: #fff;
-  cursor: pointer;
-  font-size: 16px;
-  line-height: 1;
-}
-
-.cms-gallery__nav button:hover {
-  background: rgb(51, 51, 51);
-}
-
-/* Meta / text content */
-.cms-meta {
-  max-width: 1200px;
-  margin: 64px auto 0;
-  padding: 0 24px;
-  display: grid;
-  grid-template-columns: repeat(4, 1fr);
+  flex-direction: column;
   gap: 32px;
 }
 
-@media (max-width: 809px) {
-  .cms-meta {
-    grid-template-columns: 1fr;
-    gap: 24px;
-  }
-  .cms-gallery__item {
-    width: 90vw;
-  }
+.cms-info__block {
+  display: flex;
+  flex-direction: column;
+  gap: 16px;
 }
 
-.cms-meta__label {
+.cms-info__title {
+  margin: 0;
+  font-family: "Inter Display", "Inter Display Placeholder", sans-serif;
+  font-size: 32px;
+  font-weight: 500;
+  line-height: 1.4;
+  color: rgb(238, 238, 238);
+}
+
+.cms-info__year,
+.cms-info__label {
+  margin: 0;
   font-family: "PT Mono", monospace;
   font-size: 13px;
-  color: #999;
+  line-height: 1.2;
   text-transform: uppercase;
-  margin: 0 0 8px;
+  color: rgb(238, 238, 238);
 }
 
-.cms-meta__value {
-  font-family: "Switzer", "Switzer Placeholder", sans-serif;
-  font-size: 15px;
-  line-height: 1.4;
-  color: #eee;
+.cms-info__text {
   margin: 0;
-}
-
-.cms-meta__value a {
-  color: #fff;
-}
-
-.cms-project-overview {
-  max-width: 800px;
-  margin: 64px auto 0;
-  padding: 0 24px 96px;
-  font-family: "Switzer", "Switzer Placeholder", sans-serif;
-  font-size: 17px;
-  line-height: 1.6;
-  color: #ccc;
+  font-family: "Inter Display", "Inter Display Placeholder", sans-serif;
+  font-size: 16px;
+  line-height: 1.5;
+  color: rgb(238, 238, 238);
   white-space: pre-wrap;
 }
 
-/* Mobile menu overlay (built from scratch — the original relies on
-   Framer's JS to mount this, which CMS pages intentionally don't load) */
+.cms-info__services {
+  display: flex;
+  flex-direction: column;
+  gap: 16px;
+  margin: 0;
+  padding: 0;
+  list-style: none;
+}
+
+.cms-info__services li {
+  padding: 8px 0;
+  font-family: "PT Mono", monospace;
+  font-size: 12px;
+  line-height: 1.2;
+  text-transform: uppercase;
+  color: rgb(238, 238, 238);
+}
+
+.cms-info__link {
+  align-self: flex-start;
+  padding: 4px 0;
+  font-family: "Switzer", "Switzer Placeholder", sans-serif;
+  font-size: 14px;
+  line-height: 1;
+  letter-spacing: -0.1px;
+  color: rgb(255, 255, 255);
+  text-decoration: none;
+  border-bottom: 1px solid rgb(247, 247, 247);
+}
+
+/* ------------------------------------------------------- prelomne tacke --- */
+
+@media (max-width: 1199px) {
+  .cms-list__title {
+    font-size: 38px;
+  }
+
+  .cms-card-grid {
+    grid-template-columns: minmax(0, 1fr);
+  }
+
+  .cms-card__title {
+    font-size: 26px;
+  }
+
+  .cms-hero__title {
+    font-size: 48px;
+  }
+
+  .cms-project {
+    grid-template-columns: minmax(0, 1fr) 33%;
+  }
+}
+
+@media (max-width: 809px) {
+  .cms-list {
+    gap: 32px;
+    padding: 96px 16px;
+  }
+
+  .cms-list__title {
+    font-size: 32px;
+  }
+
+  .cms-card__title {
+    font-size: 24px;
+  }
+
+  .cms-hero__title {
+    font-size: 38px;
+  }
+
+  /* Na uskom ekranu Framer podatke stavlja iznad slika. */
+  .cms-project {
+    grid-template-columns: minmax(0, 1fr);
+    gap: 32px;
+    padding: 96px 16px;
+  }
+
+  .cms-project__info {
+    order: -1;
+  }
+}
+
+/* --------------------------------------------------------- mobilni meni --- */
+
+/* Ovaj sloj original montira Framer-ov JS, koji se na CMS stranicama namerno
+   ne ucitava — pa je napisan ovde. */
 .cms-menu-overlay {
   position: fixed;
   inset: 0;
@@ -210,109 +398,4 @@ body {
   text-decoration: none;
   font-family: "Switzer", "Switzer Placeholder", sans-serif;
   font-size: 32px;
-}
-
-/* New-project cards appended to the /work listing */
-/* Kartice idu skoro od ivice do ivice, sa uskim razmakom — kao na /work. */
-.cms-card-grid {
-  display: grid;
-  grid-template-columns: repeat(2, 1fr);
-  gap: 20px;
-  margin: 24px 0 0;
-  padding: 0 20px;
-}
-
-@media (max-width: 809px) {
-  .cms-card-grid {
-    grid-template-columns: 1fr;
-  }
-}
-
-/* Kartica projekta: naslov, godina i kratak opis stoje PREKO slike, u dnu —
-   isti raspored koji Framer koristi za izabrane radove na naslovnoj. */
-
-.cms-card {
-  position: relative;
-  display: block;
-  text-decoration: none;
-  color: inherit;
-  overflow: hidden;
-}
-
-.cms-card__image {
-  width: 100%;
-  aspect-ratio: 5 / 4;
-  overflow: hidden;
-  background: rgb(29, 29, 29);
-}
-
-.cms-card__image img {
-  width: 100%;
-  height: 100%;
-  object-fit: cover;
-  display: block;
-  transition: transform 0.5s ease;
-}
-
-.cms-card:hover .cms-card__image img {
-  transform: scale(1.03);
-}
-
-/* Tekst stoji preko slike u donjoj trecini: naslov i godina levo, kratak opis
-   desno, poravnati po vrhu. */
-.cms-card__body {
-  position: absolute;
-  inset: auto 0 0 0;
-  display: flex;
-  align-items: flex-start;
-  gap: 24px;
-  padding: 24px 24px 40px;
-  pointer-events: none;
-}
-
-.cms-card__meta {
-  flex: 0 0 45%;
-}
-
-.cms-card__title {
-  margin: 0 0 18px;
-  font-family: "Inter Display", "Inter Display Placeholder", sans-serif;
-  font-size: clamp(20px, 2vw, 34px);
-  font-weight: 600;
-  line-height: 1.1;
-  color: #fff;
-}
-
-.cms-card__year {
-  margin: 0;
-  font-family: "Inter Display", "Inter Display Placeholder", sans-serif;
-  font-size: clamp(13px, 1.1vw, 20px);
-  color: #fff;
-}
-
-.cms-card__overview {
-  flex: 1 1 auto;
-  margin: 0;
-  font-family: "PT Mono", monospace;
-  font-size: clamp(9px, 0.8vw, 15px);
-  line-height: 1.6;
-  letter-spacing: 0.02em;
-  text-transform: uppercase;
-  color: #fff;
-  /* Opisi su razlicite duzine; visina kartice ne sme da igra. */
-  display: -webkit-box;
-  -webkit-line-clamp: 4;
-  -webkit-box-orient: vertical;
-  overflow: hidden;
-}
-
-@media (max-width: 809px) {
-  .cms-card__body {
-    gap: 12px;
-    padding: 16px 16px 20px;
-  }
-
-  .cms-card__title {
-    margin-bottom: 10px;
-  }
 }

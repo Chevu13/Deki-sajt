@@ -24,6 +24,8 @@ const LEGACY_FILE = path.join(ROOT, "content/legacy-work.json");
 const WORK_LIST_FILE = path.join(ROOT, "work/index.html");
 const SITEMAP_FILE = path.join(ROOT, "sitemap.xml");
 const SITE_URL = "https://www.dtumenko.com";
+// Strelica u uglu kartice — isti fajl koji Framer koristi na naslovnoj.
+const CARD_ARROW = "/assets/images/image-01d98f11.svg";
 
 function readIfExists(file) {
   return fs.existsSync(file) ? fs.readFileSync(file, "utf8") : "";
@@ -73,17 +75,22 @@ function renderGalleryItems(gallery) {
   return gallery
     .map((item) => {
       if (item.type === "video") {
-        return `      <li class="cms-gallery__item"><video src="${escapeHtml(item.src)}" muted loop playsinline controls preload="metadata"></video></li>`;
+        return `      <div class="cms-project__figure"><video src="${escapeHtml(item.src)}" muted loop playsinline controls preload="metadata"></video></div>`;
       }
-      return `      <li class="cms-gallery__item"><img src="${escapeHtml(item.src)}" alt="${escapeHtml(item.alt || "")}" loading="lazy"></li>`;
+      return `      <div class="cms-project__figure"><img src="${escapeHtml(item.src)}" alt="${escapeHtml(item.alt || "")}" loading="lazy"></div>`;
     })
     .join("\n");
 }
 
-function renderServices(services) {
+// Framer usluge redja jednu ispod druge, ne kao nabrajanje kroz zarez.
+function renderServiceList(services) {
   if (!services) return "";
-  const list = Array.isArray(services) ? services : [services];
-  return list.filter(Boolean).map(escapeHtml).join(", ");
+  const list = (Array.isArray(services) ? services : [services]).filter(Boolean);
+  if (!list.length) return "";
+  const items = list
+    .map((service) => `        <li>${escapeHtml(service)}</li>`)
+    .join("\n");
+  return `      <ul class="cms-info__services">\n${items}\n      </ul>`;
 }
 
 // "croseavillas.hr" otkucano bez protokola bi kao href bilo relativno i vodilo
@@ -98,11 +105,8 @@ function normalizeUrl(url) {
 function renderLiveLinkBlock(liveLink) {
   if (!liveLink) return "";
   const href = normalizeUrl(liveLink);
-  return `    <div>
-      <p class="cms-meta__label">Live Link</p>
-      <p class="cms-meta__value"><a href="${escapeHtml(href)}" target="_blank" rel="noopener noreferrer">${escapeHtml(liveLink)}</a></p>
-    </div>
-`;
+  // Framer ovde uvek pise "Live Work", ne sam URL.
+  return `      <a class="cms-info__link" href="${escapeHtml(href)}" target="_blank" rel="noopener noreferrer">Live Work</a>`;
 }
 
 // {{CANONICAL}} feeds <link rel="canonical">, og:url and the JSON-LD block in
@@ -136,8 +140,7 @@ function buildWorkItemPage(project, partials) {
     .replace("{{HERO_IMAGE}}", escapeHtml(project.hero_image || ""))
     .replace("{{GALLERY_ITEMS}}", renderGalleryItems(project.gallery))
     .replace("{{YEAR}}", escapeHtml(project.year || ""))
-    .replace("{{OVERVIEW}}", escapeHtml(project.overview || ""))
-    .replace("{{SERVICES}}", renderServices(project.services))
+    .replace("{{SERVICE_LIST}}", renderServiceList(project.services))
     .replace("{{LIVE_LINK_BLOCK}}", renderLiveLinkBlock(project.live_link))
     .replace("{{PROJECT_OVERVIEW}}", escapeHtml(project.project_overview || ""));
 }
@@ -145,16 +148,17 @@ function buildWorkItemPage(project, partials) {
 function buildCardGrid(projects) {
   const cards = projects
     .map(
-      (p) => `      <a class="cms-card" href="/work/${escapeHtml(p.slug)}">
-        <div class="cms-card__image"><img src="${escapeHtml(p.hero_image || (p.gallery && p.gallery[0] && p.gallery[0].src) || "")}" alt="${escapeHtml(p.title)}" loading="lazy"></div>
-        <div class="cms-card__body">
-          <div class="cms-card__meta">
-            <h3 class="cms-card__title">${escapeHtml(p.title)}</h3>
-            <p class="cms-card__year">${escapeHtml(p.year || "")}</p>
+      (p) => `        <a class="cms-card" href="/work/${escapeHtml(p.slug)}">
+          <div class="cms-card__image"><img src="${escapeHtml(p.hero_image || (p.gallery && p.gallery[0] && p.gallery[0].src) || "")}" alt="${escapeHtml(p.title)}" loading="lazy"></div>
+          <div class="cms-card__body">
+            <div class="cms-card__meta">
+              <h3 class="cms-card__title">${escapeHtml(p.title)}</h3>
+              <p class="cms-card__year">${escapeHtml(p.year || "")}</p>
+            </div>
+            <p class="cms-card__overview">${escapeHtml(p.overview || "")}</p>
           </div>
-          <p class="cms-card__overview">${escapeHtml(p.overview || "")}</p>
-        </div>
-      </a>`
+          <img class="cms-card__arrow" src="${CARD_ARROW}" alt="" aria-hidden="true">
+        </a>`
     )
     .join("\n");
   return `    <div class="cms-card-grid">\n${cards}\n    </div>`;

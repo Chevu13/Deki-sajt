@@ -11,41 +11,31 @@
     <a href="/contact">Contact</a>
   </nav>
 </div>
-<!--CMS_NAV-->
+<div class="cms-nav"><!--CMS_NAV--></div>
 <main class="cms-main">
   <header class="cms-hero">
-    <a class="cms-hero__back" href="/work">&larr; View All</a>
+    <div class="cms-hero__media"><img src="{{HERO_IMAGE}}" alt="{{TITLE}}"></div>
+    <a class="cms-hero__back" href="/work">View All</a>
     <h1 class="cms-hero__title">{{TITLE}}</h1>
-    <div class="cms-hero__image"><img src="{{HERO_IMAGE}}" alt="{{TITLE}}"></div>
   </header>
 
-  <section class="cms-gallery">
-    <ul class="cms-gallery__track" data-cms-gallery-track>
+  <div class="cms-project">
+    <div class="cms-project__media">
 {{GALLERY_ITEMS}}
-    </ul>
-    <div class="cms-gallery__nav">
-      <button type="button" data-cms-gallery-prev aria-label="Previous">&larr;</button>
-      <button type="button" data-cms-gallery-next aria-label="Next">&rarr;</button>
     </div>
-  </section>
-
-  <section class="cms-meta">
-    <div>
-      <p class="cms-meta__label">Year</p>
-      <p class="cms-meta__value">{{YEAR}}</p>
-    </div>
-    <div>
-      <p class="cms-meta__label">Overview</p>
-      <p class="cms-meta__value">{{OVERVIEW}}</p>
-    </div>
-    <div>
-      <p class="cms-meta__label">Discipline</p>
-      <p class="cms-meta__value">{{SERVICES}}</p>
-    </div>
+    <aside class="cms-project__info">
+      <div class="cms-info__block">
+        <h2 class="cms-info__title">{{TITLE}}</h2>
+        <p class="cms-info__year">{{YEAR}}</p>
+      </div>
+      <div class="cms-info__block">
+        <p class="cms-info__label">Overview</p>
+        <p class="cms-info__text">{{PROJECT_OVERVIEW}}</p>
+      </div>
+{{SERVICE_LIST}}
 {{LIVE_LINK_BLOCK}}
-  </section>
-
-  <section class="cms-project-overview">{{PROJECT_OVERVIEW}}</section>
+    </aside>
+  </div>
 </main>
 <!--CMS_FOOTER-->
 <script src="/assets/cms.js" defer></script>

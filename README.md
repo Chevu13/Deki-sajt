@@ -303,3 +303,35 @@ fontove i video.
 Preview deploy URL-ovi (`...-lv5fj70aw-...vercel.app`) su zasticeni Vercel
 login-om, pa ih ne mogu otvoriti spolja — testiraj na production domenu i uradi
 hard refresh (Cmd/Ctrl+Shift+R) jer je stari `.mjs` mozda kesiran.
+
+## Raspored CMS stranica — odakle su mere
+
+`/work` i `/work/<slug>` su jedine stranice koje ne dolaze iz Framer export-a
+(zasto — vidi komentar na vrhu `scripts/build.mjs`). Da bi ipak stajale kao
+Framer-ove, sve mere u `assets/cms.css` su **izmerene u browseru** na
+`https://dtumenko.framer.website`, ne procenjene sa slike.
+
+Framer prelomne tacke: **810px** i **1200px**.
+
+| | `>= 1200` | `810–1199` | `< 810` |
+|---|---|---|---|
+| /work naslov | 48px | 38px | 32px |
+| /work mreza | 2 kolone | 1 kolona | 1 kolona |
+| naslov kartice | 32px | 26px | 24px |
+| hero naslov projekta | 60px | 48px | 38px |
+| telo projekta | slike + podaci | slike + podaci | podaci pa slike |
+
+Sto vazi svuda: padding stranice 16px, razmak u mrezi 16px, visina kartice
+**708px na svakoj sirini**, slika kartice na `opacity: .8` preko crne, tekst
+vertikalno centriran, strelica (`image-01d98f11.svg`, rotirana -45°) u donjem
+desnom uglu.
+
+Stranica projekta: hero je visok `100vh` sa slikom preko cele povrsine i
+naslovom na sredini; telo pocinje 160px ispod heroja (Framer: 80px razmak
+sekcija + 64px padding + 16px unutrasnji padding) i deli se na slike (~70%) i
+podatke (~29%), sa razmakom 16px.
+
+Navigacija na ovim stranicama mora rucno da se digne (`.cms-nav`,
+`position: fixed`) — na Framer stranicama to radi njegov runtime, koji se ovde
+namerno ne ucitava. Bez toga bi traka stajala u toku i gurala stranicu 68px
+nize, pa hero ne bi pocinjao od vrha ekrana.
