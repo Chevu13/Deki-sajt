@@ -153,7 +153,6 @@ function buildCardGrid(projects) {
             <p class="cms-card__year">${escapeHtml(p.year || "")}</p>
           </div>
           <p class="cms-card__overview">${escapeHtml(p.overview || "")}</p>
-          <span class="cms-card__arrow" aria-hidden="true">&rarr;</span>
         </div>
       </a>`
     )
