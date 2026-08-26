@@ -39,23 +39,11 @@ function escapeHtml(str) {
   }[c]));
 }
 
-// Nav/footer partials are extracted from a depth-2 page (work/<slug>/).
-// work/index.html lives one level shallower (depth 1), so its copies of
-// the same nav/footer need their relative hrefs rewritten accordingly.
-const DEPTH2_TO_DEPTH1 = {
-  "../../": "../",
-  "../": "./",
-  "../../about": "../about",
-  "../../contact": "../contact",
-  "../../404": "../404",
-  "../../privacy-policy": "../privacy-policy",
-};
-
-function toDepth1(html) {
-  return html.replace(/href="([^"]+)"/g, (m, p1) =>
-    Object.prototype.hasOwnProperty.call(DEPTH2_TO_DEPTH1, p1) ? `href="${DEPTH2_TO_DEPTH1[p1]}"` : m
-  );
-}
+// Svi linkovi u template-ima su apsolutni ("/work", "/about", …). Relativni su
+// ovde bili greska: vercel.json ima trailingSlash: false, pa /work nema kosu
+// crtu na kraju i "./cro-sea-villas" se racuna od korena — /cro-sea-villas
+// umesto /work/cro-sea-villas, dakle 404. Apsolutne putanje rade isto na svakoj
+// dubini, pa nema ni prepravljanja nav/footer partiala po dubini stranice.
 
 function loadProjects() {
   if (!fs.existsSync(CONTENT_DIR)) return [];
@@ -157,10 +145,16 @@ function buildWorkItemPage(project, partials) {
 function buildCardGrid(projects) {
   const cards = projects
     .map(
-      (p) => `      <a class="cms-card" href="./${escapeHtml(p.slug)}">
+      (p) => `      <a class="cms-card" href="/work/${escapeHtml(p.slug)}">
         <div class="cms-card__image"><img src="${escapeHtml(p.hero_image || (p.gallery && p.gallery[0] && p.gallery[0].src) || "")}" alt="${escapeHtml(p.title)}" loading="lazy"></div>
-        <p class="cms-card__title">${escapeHtml(p.title)}</p>
-        <p class="cms-card__year">${escapeHtml(p.year || "")}</p>
+        <div class="cms-card__body">
+          <div class="cms-card__meta">
+            <h3 class="cms-card__title">${escapeHtml(p.title)}</h3>
+            <p class="cms-card__year">${escapeHtml(p.year || "")}</p>
+          </div>
+          <p class="cms-card__overview">${escapeHtml(p.overview || "")}</p>
+          <span class="cms-card__arrow" aria-hidden="true">&rarr;</span>
+        </div>
       </a>`
     )
     .join("\n");
@@ -174,13 +168,10 @@ function buildWorkListPage(allProjects, partials) {
     "Selected branding, art direction, and visual identity projects by Dejan Tumenko, Belgrade-based Creative Director.",
     "/work"
   );
-  const nav = toDepth1(partials.nav);
-  const footer = toDepth1(partials.footer);
-
   return partials.workListTemplate
     .replace("<!--CMS_HEAD-->", head)
-    .replace("<!--CMS_NAV-->", nav)
-    .replace("<!--CMS_FOOTER-->", footer)
+    .replace("<!--CMS_NAV-->", partials.nav)
+    .replace("<!--CMS_FOOTER-->", partials.footer)
     .replace("{{CARD_GRID}}", buildCardGrid(allProjects));
 }
 

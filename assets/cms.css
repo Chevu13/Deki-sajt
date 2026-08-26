@@ -215,16 +215,21 @@
   }
 }
 
+/* Kartica projekta: naslov, godina i kratak opis stoje PREKO slike, u dnu —
+   isti raspored koji Framer koristi za izabrane radove na naslovnoj. */
+
 .cms-card {
+  position: relative;
   display: block;
   text-decoration: none;
   color: inherit;
+  border-radius: 4px;
+  overflow: hidden;
 }
 
 .cms-card__image {
   width: 100%;
   aspect-ratio: 4 / 3;
-  border-radius: 4px;
   overflow: hidden;
   background: rgb(29, 29, 29);
 }
@@ -234,22 +239,86 @@
   height: 100%;
   object-fit: cover;
   display: block;
-  transition: transform 0.4s ease;
+  transition: transform 0.5s ease;
 }
 
 .cms-card:hover .cms-card__image img {
   transform: scale(1.03);
 }
 
+/* Preliv da tekst ostane citljiv i na svetloj slici. */
+.cms-card__body {
+  position: absolute;
+  inset: auto 0 0 0;
+  display: flex;
+  align-items: flex-end;
+  gap: 24px;
+  padding: 24px;
+  background: linear-gradient(to top, rgba(0, 0, 0, 0.72), rgba(0, 0, 0, 0));
+  pointer-events: none;
+}
+
+.cms-card__meta {
+  flex: 0 0 auto;
+  max-width: 45%;
+}
+
 .cms-card__title {
-  margin: 16px 0 4px;
+  margin: 0 0 2px;
   font-family: "Inter Display", "Inter Display Placeholder", sans-serif;
   font-size: 22px;
+  line-height: 1.2;
   color: #fff;
 }
 
 .cms-card__year {
+  margin: 0;
   font-family: "PT Mono", monospace;
   font-size: 13px;
-  color: #999;
+  color: rgba(255, 255, 255, 0.65);
+}
+
+.cms-card__overview {
+  flex: 1 1 auto;
+  margin: 0;
+  font-family: "PT Mono", monospace;
+  font-size: 11px;
+  line-height: 1.5;
+  letter-spacing: 0.02em;
+  text-transform: uppercase;
+  color: rgba(255, 255, 255, 0.8);
+  /* Opisi su razlicite duzine; visina kartice ne sme da igra. */
+  display: -webkit-box;
+  -webkit-line-clamp: 4;
+  -webkit-box-orient: vertical;
+  overflow: hidden;
+}
+
+.cms-card__arrow {
+  flex: none;
+  align-self: flex-end;
+  font-size: 20px;
+  line-height: 1;
+  color: #fff;
+  transition: transform 0.3s ease;
+}
+
+.cms-card:hover .cms-card__arrow {
+  transform: translateX(4px);
+}
+
+@media (max-width: 809px) {
+  .cms-card__body {
+    gap: 12px;
+    padding: 16px;
+  }
+
+  .cms-card__title {
+    font-size: 17px;
+  }
+
+  .cms-card__overview {
+    font-size: 9px;
+    -webkit-line-clamp: 3;
+  }
 }
