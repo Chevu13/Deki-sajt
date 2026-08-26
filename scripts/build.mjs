@@ -237,6 +237,49 @@ ${body}
 `;
 }
 
+// Naslovna prikazuje izabrane radove iz Framer CMS kolekcije. Ta kolekcija ima
+// fiksne stavke i novi projekti u nju ne mogu da udju — React posle hidracije
+// prezida listu iz svojih propova. Zato se novi projekti upisuju ovde, a
+// assets/home-projects.js ih posle hidracije doda kloniranjem postojece
+// kartice, isto kao sto legacy-gallery.js radi sa slikama.
+const HOME_FILE = path.join(ROOT, "index.html");
+const HOME_BLOCK_ID = "cms-home-projects";
+const HOME_SCRIPT = '<script src="/assets/home-projects.js" defer></script>';
+
+function writeHomeProjects(cmsProjects) {
+  if (!fs.existsSync(HOME_FILE)) return;
+
+  const payload = cmsProjects.map((p) => ({
+    title: p.title,
+    year: String(p.year || ""),
+    overview: p.overview || "",
+    href: `/work/${p.slug}`,
+    image: p.hero_image || (p.gallery && p.gallery[0] && p.gallery[0].src) || "",
+  }));
+
+  const block =
+    `<script type="application/json" id="${HOME_BLOCK_ID}">` +
+    JSON.stringify(payload).split("</script>").join("<\\/script>") +
+    "</script>";
+
+  let html = fs.readFileSync(HOME_FILE, "utf8");
+  const before = html;
+
+  const existing = new RegExp(
+    `<script type="application/json" id="${HOME_BLOCK_ID}">[\\s\\S]*?</script>`
+  );
+  html = existing.test(html)
+    ? html.replace(existing, block)
+    : html.replace("</body>", block + "\n</body>");
+
+  if (!html.includes("/assets/home-projects.js")) {
+    html = html.replace("</body>", HOME_SCRIPT + "\n</body>");
+  }
+
+  if (html !== before) fs.writeFileSync(HOME_FILE, html, "utf8");
+  console.log(`built  index.html (${payload.length} nov(ih) projekata za naslovnu)`);
+}
+
 function main() {
   const cmsProjects = loadProjects();
   const legacyProjects = loadLegacyProjects();
@@ -272,6 +315,8 @@ function main() {
     `built  work/index.html (${listedProjects.length} kartica, ` +
       `${allProjects.length - listedProjects.length} nelistirano)`
   );
+
+  writeHomeProjects(cmsProjects.filter((p) => !p.noindex));
 
   const sitemap = buildSitemap(listedProjects);
   fs.writeFileSync(SITEMAP_FILE, sitemap, "utf8");

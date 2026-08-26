@@ -21,6 +21,7 @@ assets/uploads                 Slike/video koje CMS panel upload-uje
 assets/cms.css, cms.js         Stilovi/JS za CMS-generisane stranice (bez Framer JS-a)
 assets/legacy-gallery.js       Dodaje slike preko Framer-ovih sest u 6 originalnih stranica
 assets/framer-nav.js           Gasi Framer klijentsku navigaciju i cuva <title> posle hidracije
+assets/home-projects.js        Dodaje nove projekte u izabrane radove na naslovnoj
 
 content/work/*.md              Podaci za nove projekte (izvor za CMS panel)
 content/legacy-work.json       Podaci za originalnih 6 projekata (za work listu)
