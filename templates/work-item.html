@@ -1,5 +1,6 @@
 <!--CMS_HEAD-->
 <link rel="stylesheet" href="/assets/cms.css">
+<noscript><style>[data-cms-reveal]{opacity:1!important;transform:none!important}</style></noscript>
 </head>
 <body>
 <div id="cms-menu-overlay" class="cms-menu-overlay" data-cms-menu-overlay>
@@ -24,11 +25,11 @@
 {{GALLERY_ITEMS}}
     </div>
     <aside class="cms-project__info">
-      <div class="cms-info__block">
+      <div class="cms-info__block" data-cms-reveal="tilt">
         <h2 class="cms-info__title">{{TITLE}}</h2>
         <p class="cms-info__year">{{YEAR}}</p>
       </div>
-      <div class="cms-info__block">
+      <div class="cms-info__block" data-cms-reveal="tilt">
         <p class="cms-info__label">Overview</p>
         <p class="cms-info__text">{{PROJECT_OVERVIEW}}</p>
       </div>

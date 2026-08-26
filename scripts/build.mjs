@@ -83,9 +83,9 @@ function renderGalleryItems(gallery) {
   return gallery
     .map((item) => {
       if (item.type === "video") {
-        return `      <div class="cms-project__figure"><video src="${escapeHtml(item.src)}" muted loop playsinline controls preload="metadata"></video></div>`;
+        return `      <div class="cms-project__figure" data-cms-reveal><video src="${escapeHtml(item.src)}" muted loop playsinline controls preload="metadata"></video></div>`;
       }
-      return `      <div class="cms-project__figure"><img src="${escapeHtml(item.src)}" alt="${escapeHtml(item.alt || "")}" loading="lazy"></div>`;
+      return `      <div class="cms-project__figure" data-cms-reveal><img src="${escapeHtml(item.src)}" alt="${escapeHtml(item.alt || "")}" loading="lazy"></div>`;
     })
     .join("\n");
 }
@@ -98,7 +98,7 @@ function renderServiceList(services) {
   const items = list
     .map((service) => `        <li>${escapeHtml(service)}</li>`)
     .join("\n");
-  return `      <ul class="cms-info__services">\n${items}\n      </ul>`;
+  return `      <ul class="cms-info__services" data-cms-reveal="tilt">\n${items}\n      </ul>`;
 }
 
 // "croseavillas.hr" otkucano bez protokola bi kao href bilo relativno i vodilo
@@ -114,7 +114,7 @@ function renderLiveLinkBlock(liveLink) {
   if (!liveLink) return "";
   const href = normalizeUrl(liveLink);
   // Framer ovde uvek pise "Live Work", ne sam URL.
-  return `      <a class="cms-info__link" href="${escapeHtml(href)}" target="_blank" rel="noopener noreferrer">Live Work</a>`;
+  return `      <a class="cms-info__link" href="${escapeHtml(href)}" target="_blank" rel="noopener noreferrer" data-cms-reveal="tilt">Live Work</a>`;
 }
 
 // {{CANONICAL}} feeds <link rel="canonical">, og:url and the JSON-LD block in
@@ -154,17 +154,29 @@ function buildWorkItemPage(project, partials) {
     .replace("{{PROJECT_OVERVIEW}}", escapeHtml(project.project_overview || ""));
 }
 
+// Godina se na hover "otkotrlja": u prozoru visine jednog reda stoje dve iste
+// godine jedna ispod druge, pa gornja izlazi na vrh dok donja ulazi odozdo.
+// Kopija je aria-hidden da je citac ekrana ne procita dvaput.
+function renderYearRoll(year) {
+  const value = escapeHtml(year || "");
+  return (
+    '<span class="cms-card__year"><span class="cms-card__roll">' +
+    `<span>${value}</span><span aria-hidden="true">${value}</span>` +
+    "</span></span>"
+  );
+}
+
 function buildCardGrid(projects) {
   const cards = projects
     .map(
       (p) => `        <a class="cms-card" href="/work/${escapeHtml(p.slug)}">
           <div class="cms-card__image"><img src="${escapeHtml(p.hero_image || (p.gallery && p.gallery[0] && p.gallery[0].src) || "")}" alt="${escapeHtml(p.title)}" loading="lazy" style="object-position:${focusPosition(p.hero_focus)}"></div>
           <div class="cms-card__body">
-            <div class="cms-card__meta">
+            <div class="cms-card__meta" data-cms-reveal>
               <h3 class="cms-card__title">${escapeHtml(p.title)}</h3>
-              <p class="cms-card__year">${escapeHtml(p.year || "")}</p>
+              ${renderYearRoll(p.year)}
             </div>
-            <p class="cms-card__overview">${escapeHtml(p.overview || "")}</p>
+            <p class="cms-card__overview" data-cms-reveal>${escapeHtml(p.overview || "")}</p>
           </div>
           <img class="cms-card__arrow" src="${CARD_ARROW}" alt="" aria-hidden="true">
         </a>`
@@ -250,50 +262,9 @@ ${body}
 `;
 }
 
-// Naslovna prikazuje izabrane radove iz Framer CMS kolekcije. Ta kolekcija ima
-// fiksne stavke i novi projekti u nju ne mogu da udju — React posle hidracije
-// prezida listu iz svojih propova. Zato se novi projekti upisuju ovde, a
-// assets/home-projects.js ih posle hidracije doda kloniranjem postojece
-// kartice, isto kao sto legacy-gallery.js radi sa slikama.
-const HOME_FILE = path.join(ROOT, "index.html");
-const HOME_BLOCK_ID = "cms-home-projects";
-const HOME_SCRIPT = '<script src="/assets/home-projects.js" defer></script>';
-
-function writeHomeProjects(projects) {
-  if (!fs.existsSync(HOME_FILE)) return;
-
-  const payload = projects.map((p) => ({
-    title: p.title,
-    year: String(p.year || ""),
-    overview: p.overview || "",
-    href: `/work/${p.slug}`,
-    image: p.hero_image || (p.gallery && p.gallery[0] && p.gallery[0].src) || "",
-    focus: focusPosition(p.hero_focus),
-  }));
-
-  const block =
-    `<script type="application/json" id="${HOME_BLOCK_ID}">` +
-    JSON.stringify(payload).split("</script>").join("<\\/script>") +
-    "</script>";
-
-  let html = fs.readFileSync(HOME_FILE, "utf8");
-  const before = html;
-
-  const existing = new RegExp(
-    `<script type="application/json" id="${HOME_BLOCK_ID}">[\\s\\S]*?</script>`
-  );
-  html = existing.test(html)
-    ? html.replace(existing, block)
-    : html.replace("</body>", block + "\n</body>");
-
-  if (!html.includes("/assets/home-projects.js")) {
-    html = html.replace("</body>", HOME_SCRIPT + "\n</body>");
-  }
-
-  if (html !== before) fs.writeFileSync(HOME_FILE, html, "utf8");
-  console.log(`built  index.html (${payload.length} nov(ih) projekata za naslovnu)`);
-}
-
+// Naslovna nije generisana. Framer je na nju stavio cetiri izabrana rada i to
+// je urednicki izbor, ne cela lista — /work je ta lista. Novi projekti se zato
+// na naslovnoj ne pojavljuju sami.
 function main() {
   const cmsProjects = loadProjects();
   const legacyProjects = loadLegacyProjects();
@@ -328,17 +299,6 @@ function main() {
   console.log(
     `built  work/index.html (${listedProjects.length} kartica, ` +
       `${allProjects.length - listedProjects.length} nelistirano)`
-  );
-
-  // Framer je na naslovnu stavio samo cetiri izabrana rada. Sve ostalo — i
-  // preostale originalne projekte i one dodate kroz /admin — dopunjuje
-  // assets/home-projects.js, pa naslovna prati /work bez rucnog odrzavanja.
-  const homeHtml = readIfExists(HOME_FILE);
-  const alreadyOnHome = new Set(
-    [...homeHtml.matchAll(/href="\.?\/?work\/([a-z0-9-]+)"/g)].map((m) => m[1])
-  );
-  writeHomeProjects(
-    listedProjects.filter((p) => !p.noindex && !alreadyOnHome.has(p.slug))
   );
 
   const sitemap = buildSitemap(listedProjects);

@@ -21,7 +21,6 @@ assets/uploads                 Slike/video koje CMS panel upload-uje
 assets/cms.css, cms.js         Stilovi/JS za CMS-generisane stranice (bez Framer JS-a)
 assets/legacy-gallery.js       Dodaje slike preko Framer-ovih sest u 6 originalnih stranica
 assets/framer-nav.js           Gasi Framer klijentsku navigaciju i cuva <title> posle hidracije
-assets/home-projects.js        Dodaje nove projekte u izabrane radove na naslovnoj
 
 content/work/*.md              Podaci za nove projekte (izvor za CMS panel)
 content/legacy-work.json       Podaci za originalnih 6 projekata (za work listu)
@@ -337,30 +336,6 @@ Navigacija na ovim stranicama mora rucno da se digne (`.cms-nav`,
 namerno ne ucitava. Bez toga bi traka stajala u toku i gurala stranicu 68px
 nize, pa hero ne bi pocinjao od vrha ekrana.
 
-### Klonirane kartice na naslovnoj
-
-`assets/home-projects.js` kartice novih projekata pravi kloniranjem Framer-ove
-(vidi komentar u fajlu). Dve stvari klon ne dobija sam, jer ih radi Framer-ov
-React — a klon u njemu ne postoji:
-
-- **Kadriranje slike.** Framer sloju sa slikom upisuje
-  `transform: translateY(...) scale(1.4)` i time pomera pojas fotografije koji
-  se vidi kroz karticu. Taj pomeraj racuna iz napretka **cele stranice**
-  (-140px na vrhu, +140px na dnu), isto za sve kartice odjednom — ne iz
-  polozaja same kartice.
-
-  Za njegove cetiri kartice to prolazi jer stoje pri vrhu stranice, pa ih vidis
-  dok je pomeraj blizu nule. Nove kartice se dodaju na dno i vidis ih tek kad je
-  pomeraj pri kraju opsega, kada kadar odlazi ka vrhu fotografije. Kod slike gde
-  je motiv pri dnu ostane samo nebo.
-
-  Zato klonovima pomeraj racunamo iz polozaja **same kartice u ekranu** — isti
-  opseg i isto uvecanje, samo sto je nula kad je kartica na sredini ekrana.
-  Pokret ostaje, a kadar je isti kao kod Framer-ovih kartica.
-- **Tamnjenje na hover.** `.7225` → `.51`. Slusa se `<a>`, ne spoljni omotac:
-  omotac je `display: contents`, nema svoj okvir pa na njemu nema ni prelaza
-  misa.
-
 ### Kadar naslovne slike (`hero_focus`)
 
 Kartica je mnogo sira nego visa, a Framer sliku jos i uvecava 1.4x — pa se od
@@ -369,9 +344,36 @@ fotografije, taj pojas ga promasi.
 
 Polje **Kadar** u panelu (`hero_focus` u frontmatteru: `top` / `center` /
 `bottom`, podrazumevano `center`) postavlja `object-position` na kartici u
-`/work`, na kartici na naslovnoj i na vrhu stranice projekta. Ne dira slike u
-galeriji.
+`/work` i na vrhu stranice projekta. Ne dira slike u galeriji.
 
 > Ako se doda novo polje u draft, mora i u `toMarkdown` u `admin/cms.js` —
 > panel pise ceo frontmatter iz drafta, pa bi rucno dodat kljuc nestao pri
 > prvom sledecem snimanju.
+
+### Naslovna se ne generise
+
+Framer je na naslovnu stavio cetiri izabrana rada. To je urednicki izbor, ne
+cela lista — cela lista je `/work`. Novi projekti se zato na naslovnoj ne
+pojavljuju sami; ako neki treba da udje medju izabrane, menja se sama
+`index.html`.
+
+### Animacije na CMS stranicama
+
+Sve je prepisano sa Framer stranica, izmereno u browseru:
+
+| gde | u miru | pokret |
+|---|---|---|
+| slika u kartici | `opacity .7225` | hover: `.51` + `scale(1.06)` |
+| godina u kartici | prvi od dva reda | hover: stub se digne za jedan red |
+| `View All`, `Live Work` | bez linije | hover: linija se uvuce s leve strane |
+| slike u galeriji | `opacity 0`, `translateY(20px)` | pri ulasku u sliku |
+| blokovi sa podacima | `opacity 0`, `translateY(25px) rotateX(15deg)` | pri ulasku u sliku |
+| naslov u heroju | `opacity .001`, `translateY(100px)` | odmah po ucitavanju |
+
+Ulazak vodi `IntersectionObserver` iz `assets/cms.js` — dodaje `.is-in` na sve
+sa `data-cms-reveal`. Ovde je pouzdan jer se na CMS stranicama ne ucitava Lenis
+smooth scroll, koji ga na Framer stranicama razbija (zato `legacy-gallery.js`
+ima svoj tajmer). Dva osiguraca: `<noscript>` blok u templateu i provera posle
+3s koja otkrije ono sto je stvarno u slici, ako observer zakaze.
+
+`prefers-reduced-motion: reduce` gasi sve to.

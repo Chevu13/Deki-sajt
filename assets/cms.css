@@ -86,16 +86,24 @@ body {
   height: 100%;
   object-fit: cover;
   display: block;
+  transition: transform 0.7s cubic-bezier(0.22, 0.61, 0.36, 1);
 }
 
+.cms-card:hover .cms-card__image img {
+  transform: scale(1.06);
+}
+
+/* Naslov i godina levo, kratak opis desno na polovini kartice — tako je i na
+   Frameru: sadrzaj je red sa `space-between`, a opis zauzima tacno pola sirine
+   (368px od 736px), pa mu redovi ispadnu na 7-9 reci. */
 .cms-card__body {
   position: relative;
   z-index: 1;
   display: flex;
-  flex-direction: column;
-  justify-content: center;
-  align-items: flex-start;
-  gap: 32px;
+  flex-direction: row;
+  justify-content: space-between;
+  align-items: center;
+  gap: 24px;
   height: 100%;
   padding: 16px;
 }
@@ -116,16 +124,35 @@ body {
   color: rgb(238, 238, 238);
 }
 
+/* Prozor visine jednog reda; unutra dve iste godine jedna ispod druge. Na
+   hover se stub podigne za jedan red, pa godina "otkotrlja" navise. */
 .cms-card__year {
-  margin: 0;
+  display: block;
+  height: 24px;
+  overflow: hidden;
+}
+
+.cms-card__roll {
+  display: block;
+  transition: transform 0.5s cubic-bezier(0.22, 0.61, 0.36, 1);
+}
+
+.cms-card__roll > span {
+  display: block;
+  height: 24px;
   font-family: "Inter Display", "Inter Display Placeholder", sans-serif;
   font-size: 16px;
   font-weight: 400;
-  line-height: 1.5;
+  line-height: 24px;
   color: rgb(238, 238, 238);
 }
 
+.cms-card:hover .cms-card__roll {
+  transform: translateY(-24px);
+}
+
 .cms-card__overview {
+  flex: 0 0 50%;
   margin: 0;
   font-family: "PT Mono", monospace;
   font-size: 13px;
@@ -179,17 +206,42 @@ body {
   display: block;
 }
 
-.cms-hero__back {
+/* "View All" i "Live Work" su isti Framer link: bez linije u miru, a na hover
+   se linija uvuce s leve strane. Framer je drzi kao poseban element parkiran na
+   left: -60px unutar linka sa overflow: hidden; ovde isto radi ::after. */
+.cms-hero__back,
+.cms-info__link {
   position: relative;
-  z-index: 1;
-  padding: 4px 0;
+  overflow: hidden;
+  padding: 4px 0 5px;
   font-family: "Switzer", "Switzer Placeholder", sans-serif;
   font-size: 14px;
   line-height: 1;
   letter-spacing: -0.1px;
   color: rgb(255, 255, 255);
   text-decoration: none;
-  border-bottom: 1px solid rgb(247, 247, 247);
+}
+
+.cms-hero__back {
+  z-index: 1;
+}
+
+.cms-hero__back::after,
+.cms-info__link::after {
+  content: "";
+  position: absolute;
+  left: 0;
+  bottom: 0;
+  width: 100%;
+  height: 1px;
+  background: rgb(247, 247, 247);
+  transform: translateX(-101%);
+  transition: transform 0.4s cubic-bezier(0.22, 0.61, 0.36, 1);
+}
+
+.cms-hero__back:hover::after,
+.cms-info__link:hover::after {
+  transform: translateX(0);
 }
 
 .cms-hero__title {
@@ -292,8 +344,11 @@ body {
   list-style: none;
 }
 
+/* Svaka disciplina je u svom redu, sa tankom linijom ispod — na Frameru je to
+   ::after sa `border-bottom: 0.8px solid rgb(99, 99, 99)`. */
 .cms-info__services li {
   padding: 8px 0;
+  border-bottom: 0.8px solid rgb(99, 99, 99);
   font-family: "PT Mono", monospace;
   font-size: 12px;
   line-height: 1.2;
@@ -303,14 +358,76 @@ body {
 
 .cms-info__link {
   align-self: flex-start;
-  padding: 4px 0;
-  font-family: "Switzer", "Switzer Placeholder", sans-serif;
-  font-size: 14px;
-  line-height: 1;
-  letter-spacing: -0.1px;
-  color: rgb(255, 255, 255);
-  text-decoration: none;
-  border-bottom: 1px solid rgb(247, 247, 247);
+}
+
+/* ----------------------------------------------------- ulazne animacije --- */
+
+/* Framer sadrzaj uvodi u sliku dok skrolujes; te vrednosti su ocitane sa
+   njegovih stranica:
+     slike u galeriji   opacity 0 -> 1, translateY(20px) -> 0
+     blokovi sa podacima opacity 0 -> 1, translateY(25px) rotateX(15deg) -> 0
+     naslov u heroju     opacity .001 -> 1, translateY(100px) -> 0, perspektiva 1200px
+   Njega vodi njegov runtime; ovde to radi IntersectionObserver iz cms.js, koji
+   dodaje .is-in. Na ovim stranicama nema Lenis smooth scrolla, pa je observer
+   pouzdan (na Framer stranicama nije — vidi assets/legacy-gallery.js).
+   Ako JS zakaze, cms.js ima i osigurac koji sve otkrije posle 3s. */
+[data-cms-reveal] {
+  opacity: 0;
+  transform: translateY(20px);
+  transition: opacity 0.8s cubic-bezier(0.44, 0, 0.06, 1),
+    transform 0.8s cubic-bezier(0.44, 0, 0.06, 1);
+}
+
+[data-cms-reveal="tilt"] {
+  transform: perspective(1200px) translateY(25px) rotateX(15deg);
+}
+
+[data-cms-reveal].is-in {
+  opacity: 1;
+  transform: none;
+}
+
+/* Hero se ne ceka na skrol — vidi se odmah, pa krece cim se stranica ucita. */
+.cms-hero__back,
+.cms-hero__title {
+  animation: cms-hero-in 0.9s cubic-bezier(0.44, 0, 0.06, 1) both;
+}
+
+.cms-hero__title {
+  animation-delay: 0.1s;
+}
+
+@keyframes cms-hero-in {
+  from {
+    opacity: 0.001;
+    transform: perspective(1200px) translateY(100px);
+  }
+  to {
+    opacity: 1;
+    transform: none;
+  }
+}
+
+/* Ko je iskljucio animacije u sistemu ne dobija ni ove. */
+@media (prefers-reduced-motion: reduce) {
+  [data-cms-reveal],
+  [data-cms-reveal].is-in {
+    opacity: 1;
+    transform: none;
+    transition: none;
+  }
+
+  .cms-hero__back,
+  .cms-hero__title {
+    animation: none;
+  }
+
+  .cms-card__image img,
+  .cms-card__roll,
+  .cms-hero__back::after,
+  .cms-info__link::after {
+    transition: none;
+  }
 }
 
 /* ------------------------------------------------------- prelomne tacke --- */
@@ -349,6 +466,18 @@ body {
 
   .cms-card__title {
     font-size: 24px;
+  }
+
+  /* Na uskom ekranu Framer opis spusta ispod naslova, preko cele sirine. */
+  .cms-card__body {
+    flex-direction: column;
+    justify-content: center;
+    align-items: flex-start;
+    gap: 32px;
+  }
+
+  .cms-card__overview {
+    flex: 0 0 auto;
   }
 
   .cms-hero__title {
