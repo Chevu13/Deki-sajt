@@ -54,9 +54,9 @@ body {
   gap: 16px;
 }
 
-/* Kartica projekta: slika je pozadina cele kartice (opacity .8 preko crne),
-   tekst stoji preko nje i vertikalno je centriran, strelica u donjem desnom
-   uglu. Visina je 708px na svakoj sirini — tako je i na Frameru. */
+/* Kartica projekta: slika je pozadina cele kartice, tekst stoji preko nje i
+   vertikalno je centriran, strelica u donjem desnom uglu. Visina je 708px na
+   svakoj sirini — tako je i na Frameru. */
 .cms-card {
   position: relative;
   display: block;
@@ -67,10 +67,18 @@ body {
   color: inherit;
 }
 
+/* Slika stoji na .7225 preko crne, a na hover potamni na .51 — obe vrednosti
+   su ocitane sa Framer kartice. Framer sliku ne zumira na hover, samo je
+   zatamni. */
 .cms-card__image {
   position: absolute;
   inset: 0;
-  opacity: 0.8;
+  opacity: 0.7225;
+  transition: opacity 0.2s ease;
+}
+
+.cms-card:hover .cms-card__image {
+  opacity: 0.51;
 }
 
 .cms-card__image img {
@@ -78,11 +86,6 @@ body {
   height: 100%;
   object-fit: cover;
   display: block;
-  transition: transform 0.6s ease;
-}
-
-.cms-card:hover .cms-card__image img {
-  transform: scale(1.04);
 }
 
 .cms-card__body {

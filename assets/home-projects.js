@@ -65,6 +65,63 @@
     if (node) node.textContent = value;
   }
 
+  // Sloj sa slikom u kartici: Framer mu inline upisuje transform (uvecanje 1.4
+  // i pomeraj koji prati skrol) i opacity. Trazi se preko inline transform-a, ne
+  // preko Framer klase — klasa se menja pri svakom novom export-u.
+  function mediaLayer(root) {
+    var img = Array.prototype.filter
+      .call(root.querySelectorAll("img"), function (node) {
+        return !/\.svg($|\?)/i.test(node.getAttribute("src") || "");
+      })[0];
+    if (!img) return null;
+
+    var node = img.parentElement;
+    while (node && node !== root) {
+      if ((node.getAttribute("style") || "").indexOf("transform") !== -1) return node;
+      node = node.parentElement;
+    }
+    return null;
+  }
+
+  // Framer taj transform prepisuje na svakom kadru skrola, ali samo svojim
+  // karticama — klon u njegovoj animaciji ne ucestvuje, pa bi ostao zamrznut na
+  // pocetnoj vrednosti i kadrirao sliku drugacije od ostalih. Zato se vrednost
+  // prepisuje sa originala; nema smisla pogadjati formulu kad se moze citati
+  // gotov rezultat.
+  var watched = null;
+
+  function syncMedia(source, layers) {
+    var apply = function () {
+      layers.forEach(function (layer) {
+        layer.style.transform = source.style.transform;
+      });
+    };
+    apply();
+    if (watched) watched.disconnect();
+    watched = new MutationObserver(apply);
+    watched.observe(source, { attributes: true, attributeFilter: ["style"] });
+  }
+
+  // Na hover Framer sliku potamni sa .7225 na .51. To radi njegov React, pa na
+  // klonu mora rucno.
+  var HOVER_OPACITY = "0.51";
+
+  function bindHover(card, layer) {
+    // Slusa se <a>, ne spoljni omotac: omotac je `display: contents`, nema svoj
+    // okvir, pa na njemu nema ni prelaza misa.
+    var target = card.matches && card.matches("a[href]") ? card : card.querySelector("a[href]");
+    if (!target) return;
+
+    var base = getComputedStyle(layer).opacity;
+    layer.style.setProperty("transition", "opacity .2s ease");
+    target.addEventListener("mouseenter", function () {
+      layer.style.setProperty("opacity", HOVER_OPACITY);
+    });
+    target.addEventListener("mouseleave", function () {
+      layer.style.setProperty("opacity", base);
+    });
+  }
+
   function buildCard(template, project, index) {
     var card = template.cloneNode(true);
     card.setAttribute(MARK, String(index));
@@ -201,12 +258,22 @@
       node.remove();
     });
 
+    var layers = [];
     projects.forEach(function (project, index) {
       var card = buildCard(found.slot, project, index);
       found.grid.appendChild(card);
       // Tek u dokumentu se moze procitati koji cvor nosi skriveno stanje.
       animateIn(card);
+
+      var layer = mediaLayer(card);
+      if (layer) {
+        layers.push(layer);
+        bindHover(card, layer);
+      }
     });
+
+    var source = mediaLayer(found.slot);
+    if (source && layers.length) syncMedia(source, layers);
     return true;
   }
 

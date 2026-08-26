@@ -322,7 +322,8 @@ Framer prelomne tacke: **810px** i **1200px**.
 | telo projekta | slike + podaci | slike + podaci | podaci pa slike |
 
 Sto vazi svuda: padding stranice 16px, razmak u mrezi 16px, visina kartice
-**708px na svakoj sirini**, slika kartice na `opacity: .8` preko crne, tekst
+**708px na svakoj sirini**, slika kartice na `opacity: .7225` preko crne (na
+hover potamni na `.51`, bez zumiranja — Framer sliku ne uvecava), tekst
 vertikalno centriran, strelica (`image-01d98f11.svg`, rotirana -45°) u donjem
 desnom uglu.
 
@@ -335,3 +336,19 @@ Navigacija na ovim stranicama mora rucno da se digne (`.cms-nav`,
 `position: fixed`) — na Framer stranicama to radi njegov runtime, koji se ovde
 namerno ne ucitava. Bez toga bi traka stajala u toku i gurala stranicu 68px
 nize, pa hero ne bi pocinjao od vrha ekrana.
+
+### Klonirane kartice na naslovnoj
+
+`assets/home-projects.js` kartice novih projekata pravi kloniranjem Framer-ove
+(vidi komentar u fajlu). Dve stvari klon ne dobija sam, jer ih radi Framer-ov
+React — a klon u njemu ne postoji:
+
+- **Kadriranje slike.** Framer sloju sa slikom na svakom kadru skrola upisuje
+  `transform: translateY(...) scale(1.4)`; vrednost ide otprilike od -140px do
+  +80px. Klon bi ostao zamrznut na pocetnih -140px i kadrirao sliku vidno
+  drugacije od ostalih kartica. Zato se transform **prepisuje sa originala**
+  (`MutationObserver` na njegov `style`) — nema smisla pogadjati formulu kad se
+  moze citati gotov rezultat.
+- **Tamnjenje na hover.** `.7225` → `.51`. Slusa se `<a>`, ne spoljni omotac:
+  omotac je `display: contents`, nema svoj okvir pa na njemu nema ni prelaza
+  misa.
