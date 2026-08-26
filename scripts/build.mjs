@@ -246,10 +246,10 @@ const HOME_FILE = path.join(ROOT, "index.html");
 const HOME_BLOCK_ID = "cms-home-projects";
 const HOME_SCRIPT = '<script src="/assets/home-projects.js" defer></script>';
 
-function writeHomeProjects(cmsProjects) {
+function writeHomeProjects(projects) {
   if (!fs.existsSync(HOME_FILE)) return;
 
-  const payload = cmsProjects.map((p) => ({
+  const payload = projects.map((p) => ({
     title: p.title,
     year: String(p.year || ""),
     overview: p.overview || "",
@@ -316,7 +316,16 @@ function main() {
       `${allProjects.length - listedProjects.length} nelistirano)`
   );
 
-  writeHomeProjects(cmsProjects.filter((p) => !p.noindex));
+  // Framer je na naslovnu stavio samo cetiri izabrana rada. Sve ostalo — i
+  // preostale originalne projekte i one dodate kroz /admin — dopunjuje
+  // assets/home-projects.js, pa naslovna prati /work bez rucnog odrzavanja.
+  const homeHtml = readIfExists(HOME_FILE);
+  const alreadyOnHome = new Set(
+    [...homeHtml.matchAll(/href="\.?\/?work\/([a-z0-9-]+)"/g)].map((m) => m[1])
+  );
+  writeHomeProjects(
+    listedProjects.filter((p) => !p.noindex && !alreadyOnHome.has(p.slug))
+  );
 
   const sitemap = buildSitemap(listedProjects);
   fs.writeFileSync(SITEMAP_FILE, sitemap, "utf8");

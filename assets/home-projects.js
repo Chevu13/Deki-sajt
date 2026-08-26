@@ -89,28 +89,101 @@
       img.removeAttribute("decoding");
     });
 
-    // Redosled teksta u kartici je: naslov (h3), godina, kratak opis.
-    setText(card.querySelector("h1, h2, h3, h4"), project.title || "");
-    var paragraphs = card.querySelectorAll("p");
-    if (paragraphs[0]) setText(paragraphs[0], project.year || "");
-    if (paragraphs[1]) setText(paragraphs[1], project.overview || "");
+    card.querySelectorAll("h1, h2, h3, h4").forEach(function (heading) {
+      setText(heading, project.title || "");
+    });
+
+    // Framer renderuje desktop i mobilnu varijantu, pa godina stoji dva puta:
+    // redosled pasusa je naslov, godina, godina, opis. Zato se ne gadja po
+    // indeksu nego po sadrzaju — najduzi pasus je opis, svi ostali su godina.
+    var paragraphs = Array.prototype.slice.call(card.querySelectorAll("p"));
+    var longest = "";
+    paragraphs.forEach(function (p) {
+      var text = (p.textContent || "").trim();
+      if (text.length > longest.length) longest = text;
+    });
+
+    paragraphs.forEach(function (p) {
+      var text = (p.textContent || "").trim();
+      setText(p, text === longest ? project.overview || "" : project.year || "");
+    });
 
     return card;
   }
 
-  // Framer drzi kartice sakrivene (opacity 0 + pomeraj) dok ih scroll animacija
-  // ne pusti. Klon u toj animaciji ne ucestvuje, pa bi ostao nevidljiv zauvek.
+  // Framer drzi kartice sakrivene (opacity 0 + pomeraj) dok ih njegova scroll
+  // animacija ne pusti. Klon u toj animaciji ne ucestvuje, pa bi ostao nevidljiv
+  // zauvek. Stanje ne stoji na spoljnem omotacu — on je `display: contents` i na
+  // njemu stil nema efekta — nego na kontejneru unutra.
   //
-  // Stanje ne stoji na spoljnem omotacu — on je `display: contents` i na njemu
-  // stil nema efekta — nego na kontejneru unutra. Zato se posle ubacivanja
-  // prolazi kroz sam cvor i potomke i otkriva se sve sto je na nuli.
-  function reveal(root) {
-    var nodes = [root].concat(Array.prototype.slice.call(root.querySelectorAll("*")));
+  // Nadje se taj cvor i preuzme se animacija: isti fade uz pomeraj, samo vodjen
+  // IntersectionObserver-om umesto Framer-om.
+  function hiddenNodes(root) {
+    return [root]
+      .concat(Array.prototype.slice.call(root.querySelectorAll("*")))
+      .filter(function (node) {
+        return getComputedStyle(node).opacity === "0";
+      });
+  }
+
+  function prime(root) {
+    var nodes = hiddenNodes(root);
     nodes.forEach(function (node) {
-      if (getComputedStyle(node).opacity !== "0") return;
+      node.style.setProperty("transition", "opacity .7s ease, transform .7s ease");
+      node.style.setProperty("will-change", "opacity, transform");
+    });
+    return nodes;
+  }
+
+  function reveal(nodes) {
+    nodes.forEach(function (node) {
       node.style.setProperty("opacity", "1");
       node.style.setProperty("transform", "none");
     });
+  }
+
+  // Okidac je provera polozaja pri skrolu, ne IntersectionObserver: stranica
+  // koristi Lenis smooth scroll, uz koji IO na ovim karticama ne okida
+  // pouzdano. getBoundingClientRect se racuna u trenutku poziva, pa radi bez
+  // obzira na to kako se skroluje.
+  function animateIn(card) {
+    var nodes = prime(card);
+    if (!nodes.length) return;
+
+    // Spoljni omotac je `display: contents` i nema svoj okvir — meri se
+    // kontejner koji stvarno zauzima prostor.
+    var measured = nodes[0];
+
+    function uSlici() {
+      var rect = measured.getBoundingClientRect();
+      return rect.top < window.innerHeight * 0.88 && rect.bottom > 0;
+    }
+
+    // Provera na svakom frejmu umesto na `scroll` dogadjaj — stranica koristi
+    // Lenis smooth scroll, pa se ne oslanjamo na to kako on skroluje.
+    //
+    // Uslov nije samo "u slici" nego "usla u sliku": odmah po ubacivanju
+    // sekcija jos nema punu visinu i sve kartice izgledaju kao da su pri vrhu,
+    // pa bi se animacija odigrala van ekrana. Ceka se da kartica bar jednom
+    // bude ispod ivice, sto se desi cim raspored slegne.
+    //
+    // Posle 12s se otkriva bezuslovno — kartica ne sme da ostane nevidljiva ako
+    // okidac nikad ne odradi svoje.
+    var pocetak = performance.now();
+    var bilaVanEkrana = false;
+
+    function tick(sada) {
+      var uSlicu = uSlici();
+      if (!uSlicu) bilaVanEkrana = true;
+
+      if (sada - pocetak > 12000 || (bilaVanEkrana && uSlicu)) {
+        reveal(nodes);
+        return;
+      }
+      requestAnimationFrame(tick);
+    }
+
+    requestAnimationFrame(tick);
   }
 
   function apply(projects) {
@@ -122,8 +195,6 @@
 
     var existing = found.grid.querySelectorAll("[" + MARK + "]");
     if (existing.length === projects.length) {
-      // Ako Framer u medjuvremenu vrati skriveno stanje, vrati se otkrivanje.
-      Array.prototype.forEach.call(existing, reveal);
       return true;
     }
     Array.prototype.forEach.call(existing, function (node) {
@@ -134,7 +205,7 @@
       var card = buildCard(found.slot, project, index);
       found.grid.appendChild(card);
       // Tek u dokumentu se moze procitati koji cvor nosi skriveno stanje.
-      reveal(card);
+      animateIn(card);
     });
     return true;
   }
