@@ -72,13 +72,21 @@
     var link = card.matches && card.matches("a[href]") ? card : card.querySelector("a[href]");
     if (link) link.setAttribute("href", project.href);
 
+    // U kartici su dve slike: mala ikonica (strelica, .svg) i velika slika
+    // projekta. Menja se samo ova druga.
     card.querySelectorAll("img").forEach(function (img) {
       if (!project.image) return;
+      if (/\.svg($|\?)/i.test(img.getAttribute("src") || "")) return;
+
       img.setAttribute("src", project.image);
       img.removeAttribute("srcset");
       img.removeAttribute("sizes");
       img.setAttribute("alt", project.title || "");
-      img.setAttribute("loading", "lazy");
+      // Originalne slike ucitava Framer svojom logikom; klon u njoj ne
+      // ucestvuje, pa bi uz `lazy` ostao prazan — kartica se nalazi u dugackoj
+      // sticky sekciji gde se browserov okidac ne aktivira.
+      img.setAttribute("loading", "eager");
+      img.removeAttribute("decoding");
     });
 
     // Redosled teksta u kartici je: naslov (h3), godina, kratak opis.
@@ -87,11 +95,22 @@
     if (paragraphs[0]) setText(paragraphs[0], project.year || "");
     if (paragraphs[1]) setText(paragraphs[1], project.overview || "");
 
-    // Framer drzi svoje kartice sakrivene dok ih scroll animacija ne pusti;
-    // klon nije deo te animacije pa bi ostao nevidljiv.
-    card.style.setProperty("opacity", "1");
-    card.style.setProperty("transform", "none");
     return card;
+  }
+
+  // Framer drzi kartice sakrivene (opacity 0 + pomeraj) dok ih scroll animacija
+  // ne pusti. Klon u toj animaciji ne ucestvuje, pa bi ostao nevidljiv zauvek.
+  //
+  // Stanje ne stoji na spoljnem omotacu — on je `display: contents` i na njemu
+  // stil nema efekta — nego na kontejneru unutra. Zato se posle ubacivanja
+  // prolazi kroz sam cvor i potomke i otkriva se sve sto je na nuli.
+  function reveal(root) {
+    var nodes = [root].concat(Array.prototype.slice.call(root.querySelectorAll("*")));
+    nodes.forEach(function (node) {
+      if (getComputedStyle(node).opacity !== "0") return;
+      node.style.setProperty("opacity", "1");
+      node.style.setProperty("transform", "none");
+    });
   }
 
   function apply(projects) {
@@ -102,13 +121,20 @@
     if (!found) return false;
 
     var existing = found.grid.querySelectorAll("[" + MARK + "]");
-    if (existing.length === projects.length) return true;
+    if (existing.length === projects.length) {
+      // Ako Framer u medjuvremenu vrati skriveno stanje, vrati se otkrivanje.
+      Array.prototype.forEach.call(existing, reveal);
+      return true;
+    }
     Array.prototype.forEach.call(existing, function (node) {
       node.remove();
     });
 
     projects.forEach(function (project, index) {
-      found.grid.appendChild(buildCard(found.slot, project, index));
+      var card = buildCard(found.slot, project, index);
+      found.grid.appendChild(card);
+      // Tek u dokumentu se moze procitati koji cvor nosi skriveno stanje.
+      reveal(card);
     });
     return true;
   }
