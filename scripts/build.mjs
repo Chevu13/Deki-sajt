@@ -27,6 +27,14 @@ const SITE_URL = "https://www.dtumenko.com";
 // Strelica u uglu kartice — isti fajl koji Framer koristi na naslovnoj.
 const CARD_ARROW = "/assets/images/image-01d98f11.svg";
 
+// Kartica je mnogo sira nego visa, pa se od naslovne slike vidi samo pojas
+// preko sredine. `hero_focus` iz CMS-a bira koji pojas — "Kadar" u panelu.
+function focusPosition(focus) {
+  if (focus === "top") return "center top";
+  if (focus === "bottom") return "center bottom";
+  return "center center";
+}
+
 function readIfExists(file) {
   return fs.existsSync(file) ? fs.readFileSync(file, "utf8") : "";
 }
@@ -138,6 +146,7 @@ function buildWorkItemPage(project, partials) {
     .replace("<!--CMS_FOOTER-->", partials.footer)
     .replace(/\{\{TITLE\}\}/g, escapeHtml(project.title))
     .replace("{{HERO_IMAGE}}", escapeHtml(project.hero_image || ""))
+    .replace("{{HERO_FOCUS}}", focusPosition(project.hero_focus))
     .replace("{{GALLERY_ITEMS}}", renderGalleryItems(project.gallery))
     .replace("{{YEAR}}", escapeHtml(project.year || ""))
     .replace("{{SERVICE_LIST}}", renderServiceList(project.services))
@@ -149,7 +158,7 @@ function buildCardGrid(projects) {
   const cards = projects
     .map(
       (p) => `        <a class="cms-card" href="/work/${escapeHtml(p.slug)}">
-          <div class="cms-card__image"><img src="${escapeHtml(p.hero_image || (p.gallery && p.gallery[0] && p.gallery[0].src) || "")}" alt="${escapeHtml(p.title)}" loading="lazy"></div>
+          <div class="cms-card__image"><img src="${escapeHtml(p.hero_image || (p.gallery && p.gallery[0] && p.gallery[0].src) || "")}" alt="${escapeHtml(p.title)}" loading="lazy" style="object-position:${focusPosition(p.hero_focus)}"></div>
           <div class="cms-card__body">
             <div class="cms-card__meta">
               <h3 class="cms-card__title">${escapeHtml(p.title)}</h3>
@@ -259,6 +268,7 @@ function writeHomeProjects(projects) {
     overview: p.overview || "",
     href: `/work/${p.slug}`,
     image: p.hero_image || (p.gallery && p.gallery[0] && p.gallery[0].src) || "",
+    focus: focusPosition(p.hero_focus),
   }));
 
   const block =

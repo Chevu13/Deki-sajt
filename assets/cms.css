@@ -210,6 +210,9 @@ body {
 .cms-project {
   display: grid;
   grid-template-columns: minmax(0, 1fr) 29%;
+  /* Bez ovoga bi desna kolona bila razvucena na visinu cele mreze, pa `sticky`
+     ne bi imao kuda da se pomera. */
+  align-items: start;
   gap: 16px;
   padding: 160px 16px 128px;
 }
@@ -236,7 +239,11 @@ body {
   display: block;
 }
 
+/* Podaci prate skrol dok se slike smenjuju pored njih — isto kao na Frameru
+   (position: sticky, top: 48px). */
 .cms-project__info {
+  position: sticky;
+  top: 48px;
   display: flex;
   flex-direction: column;
   gap: 32px;
@@ -355,8 +362,11 @@ body {
     padding: 96px 16px;
   }
 
+  /* Na uskom ekranu podaci stoje iznad slika, pa nemaju uz sta da putuju —
+     `sticky` bi ih samo prelepio preko galerije. */
   .cms-project__info {
     order: -1;
+    position: static;
   }
 }
 

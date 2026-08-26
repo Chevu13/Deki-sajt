@@ -10,6 +10,7 @@ services:
 overview: Two photographers, one shared name, and a documentary eye for the unscripted moments that make a wedding day unforgettable.
 live_link: https://www.djokovicidjordje.com/
 hero_image: /assets/uploads/mt8qan6q-foto-pettine-ifjhaioaoqe-unsplash.jpg
+hero_focus: bottom
 gallery:
   - type: image
     src: /assets/uploads/mt8qay3v-7.jpg

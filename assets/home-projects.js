@@ -83,23 +83,52 @@
     return null;
   }
 
-  // Framer taj transform prepisuje na svakom kadru skrola, ali samo svojim
-  // karticama — klon u njegovoj animaciji ne ucestvuje, pa bi ostao zamrznut na
-  // pocetnoj vrednosti i kadrirao sliku drugacije od ostalih. Zato se vrednost
-  // prepisuje sa originala; nema smisla pogadjati formulu kad se moze citati
-  // gotov rezultat.
-  var watched = null;
+  // Framer sliku uvecava 1.4x i pomera je po vertikali dok se skroluje, pa se
+  // od kartice vidi samo pojas fotografije. Taj pomeraj on racuna iz napretka
+  // CELE stranice, a ne iz polozaja same kartice: pri vrhu stranice je -140px,
+  // pri dnu +140px, isto za sve kartice.
+  //
+  // Za njegove cetiri kartice to prolazi jer su pri vrhu stranice, pa ih vidis
+  // dok je pomeraj blizu nule. Nove kartice stoje na dnu i vidis ih tek kad je
+  // pomeraj vec pri kraju opsega — tada kadar odlazi ka vrhu fotografije. Kod
+  // fotografije gde je ono sto se gleda pri dnu (par u donjoj cetvrtini) ostane
+  // samo nebo.
+  //
+  // Zato klonovima pomeraj racunamo iz polozaja SAME kartice u ekranu: isti
+  // opseg i isto uvecanje, samo sto je nula kad je kartica na sredini ekrana —
+  // dakle tacno onako kako se vide i Framer-ove.
+  // Petlja se pusta samo jednom; ako se kartice ikad preprave, `tracked` se
+  // zameni novim spiskom umesto da se pokrene druga petlja.
+  var tracked = [];
+  var running = false;
 
-  function syncMedia(source, layers) {
-    var apply = function () {
-      layers.forEach(function (layer) {
-        layer.style.transform = source.style.transform;
+  function parallax(cards) {
+    tracked = cards;
+    if (running || !cards.length) return;
+    running = true;
+
+    // Opseg i uvecanje se citaju sa klona (kopija Framer-ovog markupa), da ne
+    // bi bili zakucani ovde.
+    var start = cards[0].layer.style.transform || "";
+    var read = start.match(/translateY\((-?[\d.]+)px\)\s*scale\(([\d.]+)\)/);
+    var amplitude = read ? Math.abs(parseFloat(read[1])) : 140;
+    var scale = read ? parseFloat(read[2]) : 1.4;
+
+    function frame() {
+      tracked.forEach(function (entry) {
+        // Meri se <a>: spoljni omotac je `display: contents` i nema svoj okvir.
+        var rect = entry.box.getBoundingClientRect();
+        var span = window.innerHeight + rect.height;
+        // 0 kad kartica tek ulazi odozdo, 1 kad izlazi na vrh, 0.5 na sredini.
+        var progress = Math.min(1, Math.max(0, (window.innerHeight - rect.top) / span));
+        var offset = -amplitude + 2 * amplitude * progress;
+        entry.layer.style.transform =
+          "translateY(" + offset.toFixed(2) + "px) scale(" + scale + ")";
       });
-    };
-    apply();
-    if (watched) watched.disconnect();
-    watched = new MutationObserver(apply);
-    watched.observe(source, { attributes: true, attributeFilter: ["style"] });
+      requestAnimationFrame(frame);
+    }
+
+    requestAnimationFrame(frame);
   }
 
   // Na hover Framer sliku potamni sa .7225 na .51. To radi njegov React, pa na
@@ -144,6 +173,9 @@
       // sticky sekciji gde se browserov okidac ne aktivira.
       img.setAttribute("loading", "eager");
       img.removeAttribute("decoding");
+      // Od kartice se vidi samo pojas preko sredine slike; "Kadar" u panelu
+      // bira koji pojas ostaje u kadru.
+      if (project.focus) img.style.setProperty("object-position", project.focus);
     });
 
     card.querySelectorAll("h1, h2, h3, h4").forEach(function (heading) {
@@ -258,7 +290,7 @@
       node.remove();
     });
 
-    var layers = [];
+    var media = [];
     projects.forEach(function (project, index) {
       var card = buildCard(found.slot, project, index);
       found.grid.appendChild(card);
@@ -266,14 +298,14 @@
       animateIn(card);
 
       var layer = mediaLayer(card);
-      if (layer) {
-        layers.push(layer);
+      var box = card.matches && card.matches("a[href]") ? card : card.querySelector("a[href]");
+      if (layer && box) {
+        media.push({ box: box, layer: layer });
         bindHover(card, layer);
       }
     });
 
-    var source = mediaLayer(found.slot);
-    if (source && layers.length) syncMedia(source, layers);
+    parallax(media);
     return true;
   }
 

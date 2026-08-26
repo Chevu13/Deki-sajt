@@ -394,6 +394,7 @@
       liveLink: data.live_link || "",
       services: services.map(String),
       thumb: { src: data.hero_image || "", alt: "", match: data.hero_image || "" },
+      heroFocus: data.hero_focus || "center",
       images: images,
       video: video,
     };
@@ -421,6 +422,7 @@
       overview: item.overview,
       live_link: item.liveLink || "",
       hero_image: item.thumb.src || "",
+      hero_focus: item.heroFocus || "center",
       gallery: gallery,
     };
     if (data.year === undefined || isNaN(data.year)) delete data.year;
@@ -1591,6 +1593,39 @@
           : "Naslovna slika — kartica na /work i vrh stranice projekta."
       )
     );
+
+    // Kartica je mnogo sira nego visa, pa se od naslovne slike vidi samo pojas
+    // preko sredine. Ako je ono sto se gleda pri vrhu ili pri dnu fotografije
+    // (npr. par u donjoj cetvrtini, a iznad njih samo nebo), taj pojas ga
+    // promasi. Ovim se bira koji deo slike ostaje u kadru.
+    if (!isLegacy) {
+      fields.push(
+        fieldRow(
+          "Kadar",
+          el(
+            "span",
+            { class: "status-select pill" },
+            [
+              el(
+                "select",
+                {
+                  onchange: function (event) {
+                    draft.heroFocus = event.target.value;
+                    markDirty();
+                  },
+                },
+                [
+                  el("option", { value: "top", selected: draft.heroFocus === "top" }, ["Vrh slike"]),
+                  el("option", { value: "center", selected: draft.heroFocus !== "top" && draft.heroFocus !== "bottom" }, ["Sredina slike"]),
+                  el("option", { value: "bottom", selected: draft.heroFocus === "bottom" }, ["Dno slike"]),
+                ]
+              ),
+            ]
+          ),
+          "Koji deo naslovne slike da ostane u kadru na karticama i na vrhu stranice projekta."
+        )
+      );
+    }
 
     draft.images.forEach(function (image, index) {
       fields.push(

@@ -343,12 +343,35 @@ nize, pa hero ne bi pocinjao od vrha ekrana.
 (vidi komentar u fajlu). Dve stvari klon ne dobija sam, jer ih radi Framer-ov
 React — a klon u njemu ne postoji:
 
-- **Kadriranje slike.** Framer sloju sa slikom na svakom kadru skrola upisuje
-  `transform: translateY(...) scale(1.4)`; vrednost ide otprilike od -140px do
-  +80px. Klon bi ostao zamrznut na pocetnih -140px i kadrirao sliku vidno
-  drugacije od ostalih kartica. Zato se transform **prepisuje sa originala**
-  (`MutationObserver` na njegov `style`) — nema smisla pogadjati formulu kad se
-  moze citati gotov rezultat.
+- **Kadriranje slike.** Framer sloju sa slikom upisuje
+  `transform: translateY(...) scale(1.4)` i time pomera pojas fotografije koji
+  se vidi kroz karticu. Taj pomeraj racuna iz napretka **cele stranice**
+  (-140px na vrhu, +140px na dnu), isto za sve kartice odjednom — ne iz
+  polozaja same kartice.
+
+  Za njegove cetiri kartice to prolazi jer stoje pri vrhu stranice, pa ih vidis
+  dok je pomeraj blizu nule. Nove kartice se dodaju na dno i vidis ih tek kad je
+  pomeraj pri kraju opsega, kada kadar odlazi ka vrhu fotografije. Kod slike gde
+  je motiv pri dnu ostane samo nebo.
+
+  Zato klonovima pomeraj racunamo iz polozaja **same kartice u ekranu** — isti
+  opseg i isto uvecanje, samo sto je nula kad je kartica na sredini ekrana.
+  Pokret ostaje, a kadar je isti kao kod Framer-ovih kartica.
 - **Tamnjenje na hover.** `.7225` → `.51`. Slusa se `<a>`, ne spoljni omotac:
   omotac je `display: contents`, nema svoj okvir pa na njemu nema ni prelaza
   misa.
+
+### Kadar naslovne slike (`hero_focus`)
+
+Kartica je mnogo sira nego visa, a Framer sliku jos i uvecava 1.4x — pa se od
+naslovne slike vidi samo pojas preko sredine. Ako je motiv pri vrhu ili pri dnu
+fotografije, taj pojas ga promasi.
+
+Polje **Kadar** u panelu (`hero_focus` u frontmatteru: `top` / `center` /
+`bottom`, podrazumevano `center`) postavlja `object-position` na kartici u
+`/work`, na kartici na naslovnoj i na vrhu stranice projekta. Ne dira slike u
+galeriji.
+
+> Ako se doda novo polje u draft, mora i u `toMarkdown` u `admin/cms.js` —
+> panel pise ceo frontmatter iz drafta, pa bi rucno dodat kljuc nestao pri
+> prvom sledecem snimanju.
