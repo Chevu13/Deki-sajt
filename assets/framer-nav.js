@@ -1,7 +1,8 @@
-/* Dve ispravke Framer runtime-a na exportovanim stranicama.
+/* Tri ispravke Framer runtime-a na exportovanim stranicama.
  *
  * 1. Klijentska navigacija — iskljucena.
- * 2. Naslov stranice — vracen na onaj iz HTML-a.
+ * 2. Tap na dodirnom ekranu — uvek vodi, i iz prvog puta.
+ * 3. Naslov stranice — vracen na onaj iz HTML-a.
  *
  * Framer export nosi svoj router: klik na interni link se presretne i stranica
  * se iscrta na klijentu, iz podataka koje Framer nosi sa sobom. To je bilo u
@@ -21,9 +22,55 @@
 (function () {
   "use strict";
 
+  /* ---------------------------------------------------------- navigacija */
+
+  function linkFor(node) {
+    var link = node && node.closest ? node.closest("a[href]") : null;
+    if (!link) return null;
+    if (link.hasAttribute("download")) return null;
+    if (link.target && link.target !== "_self") return null;
+    return link;
+  }
+
+  // vercel.json ima trailingSlash: false, pa je kanonska putanja bez kose crte
+  // na kraju. Framer u exportu koristi relativne linkove ("../work"), koji se
+  // racunaju od nivoa TRENUTNE putanje — ako se stranica ipak otvori sa kosom
+  // crtom (/about/), "../work" postaje /about/work umesto /work, i ceo meni
+  // vodi u 404. Zato se racuna od kanonske putanje, ne od one iz adrese.
+  function canonicalPath(path) {
+    return path.length > 1 && path.charAt(path.length - 1) === "/"
+      ? path.slice(0, -1)
+      : path;
+  }
+
+  // Vraca odrediste samo ako je u pitanju interni link koji zaista vodi na
+  // drugu stranicu; sidro unutar iste stranice ostaje sidro.
+  function internalTarget(link) {
+    var raw = link.getAttribute("href");
+    if (!raw) return null;
+
+    var here = canonicalPath(location.pathname);
+    var url;
+    try {
+      url = new URL(raw, location.origin + here + location.search);
+    } catch (err) {
+      return null;
+    }
+    if (url.origin !== location.origin) return null;
+    if (canonicalPath(url.pathname) === here && url.hash) return null;
+    return url.href;
+  }
+
+  function go(href) {
+    try {
+      location.assign(href);
+    } catch (err) {
+      location.href = href;
+    }
+  }
+
   function isPlainLeftClick(event) {
     return (
-      !event.defaultPrevented &&
       event.button === 0 &&
       !event.metaKey &&
       !event.ctrlKey &&
@@ -32,33 +79,86 @@
     );
   }
 
+  // Namerno se NE gleda event.defaultPrevented: ako je neki drugi rukovalac
+  // stigao pre nas i vec otkazao podrazumevanu radnju, to je upravo slucaj u
+  // kome bi Framer preuzeo navigaciju i prikazao staro stanje. Interni link
+  // uvek treba da bude obicno ucitavanje.
   function onClick(event) {
     if (!isPlainLeftClick(event)) return;
 
-    var link = event.target && event.target.closest ? event.target.closest("a[href]") : null;
+    var link = linkFor(event.target);
     if (!link) return;
-    if (link.hasAttribute("download")) return;
-    if (link.target && link.target !== "_self") return;
 
-    var url;
-    try {
-      url = new URL(link.href, location.href);
-    } catch (err) {
-      return;
-    }
-
-    if (url.origin !== location.origin) return;
-    // Sidro unutar iste stranice ostaje sidro.
-    if (url.pathname === location.pathname && url.hash) return;
+    var href = internalTarget(link);
+    if (!href) return;
 
     // Capture faza + stopImmediatePropagation: Framer-ov rukovalac nikad ne
     // vidi ovaj klik.
     event.preventDefault();
     event.stopImmediatePropagation();
-    location.assign(url.href);
+    go(href);
   }
 
   document.addEventListener("click", onClick, true);
+
+  /* --------------------------------------------------------------- dodir */
+
+  // Stranice koriste Lenis smooth scroll. Dok stranica jos klizi po inerciji,
+  // prvi dodir cesto samo zaustavi to klizanje i nikad ne postane klik — pa
+  // izgleda kao da link ne radi dok se ne tapne jos par puta.
+  //
+  // Zato se tap hvata na `touchend`: ako se prst pomerio jedva i dodir je
+  // trajao kratko, to je tap i vodi se kao navigacija. `preventDefault`
+  // sprecava klik koji bi browser posle toga sam napravio, pa nema dvostruke
+  // navigacije.
+  var TAP_SLOP = 10; // px
+  var TAP_TIME = 700; // ms
+  var touch = null;
+
+  document.addEventListener(
+    "touchstart",
+    function (event) {
+      if (event.touches.length !== 1) {
+        touch = null;
+        return;
+      }
+      var point = event.touches[0];
+      touch = {
+        x: point.clientX,
+        y: point.clientY,
+        at: Date.now(),
+        link: linkFor(event.target),
+      };
+    },
+    true
+  );
+
+  document.addEventListener("touchcancel", function () {
+    touch = null;
+  }, true);
+
+  document.addEventListener(
+    "touchend",
+    function (event) {
+      var start = touch;
+      touch = null;
+      if (!start || !start.link) return;
+
+      var point = event.changedTouches && event.changedTouches[0];
+      if (!point) return;
+      if (Math.abs(point.clientX - start.x) > TAP_SLOP) return;
+      if (Math.abs(point.clientY - start.y) > TAP_SLOP) return;
+      if (Date.now() - start.at > TAP_TIME) return;
+
+      var href = internalTarget(start.link);
+      if (!href) return;
+
+      event.preventDefault();
+      event.stopImmediatePropagation();
+      go(href);
+    },
+    true
+  );
 
   /* --------------------------------------------------------------- naslov */
 

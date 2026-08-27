@@ -484,17 +484,41 @@ body {
     font-size: 38px;
   }
 
-  /* Na uskom ekranu Framer podatke stavlja iznad slika. */
   .cms-project {
     grid-template-columns: minmax(0, 1fr);
     gap: 32px;
-    padding: 96px 16px;
+    /* Razmak od heroja ostaje 160px i ovde — na Frameru galerija pocinje na
+       960px pri heroju od 800px. */
+    padding: 160px 16px 96px;
   }
 
-  /* Na uskom ekranu podaci stoje iznad slika, pa nemaju uz sta da putuju —
-     `sticky` bi ih samo prelepio preko galerije. */
+  /* Na uskom ekranu se slike prevlace u stranu, jedna preko celog reda, umesto
+     da se redjaju jedna ispod druge. Framer to radi istim sredstvima: flex red,
+     `overflow-x: auto` i `scroll-snap`, sa visinom stavke od 282px. */
+  .cms-project__media {
+    flex-direction: row;
+    gap: 10px;
+    overflow-x: auto;
+    overflow-y: hidden;
+    scroll-snap-type: x mandatory;
+    -webkit-overflow-scrolling: touch;
+    scrollbar-width: none;
+  }
+
+  .cms-project__media::-webkit-scrollbar {
+    display: none;
+  }
+
+  .cms-project__figure {
+    flex: 0 0 100%;
+    height: 282px;
+    aspect-ratio: auto;
+    scroll-snap-align: center;
+  }
+
+  /* Podaci idu ispod galerije i tu stoje — nemaju uz sta da putuju, pa bi ih
+     `sticky` samo prelepio preko nje. */
   .cms-project__info {
-    order: -1;
     position: static;
   }
 }

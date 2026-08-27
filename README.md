@@ -318,7 +318,7 @@ Framer prelomne tacke: **810px** i **1200px**.
 | /work mreza | 2 kolone | 1 kolona | 1 kolona |
 | naslov kartice | 32px | 26px | 24px |
 | hero naslov projekta | 60px | 48px | 38px |
-| telo projekta | slike + podaci | slike + podaci | podaci pa slike |
+| telo projekta | slike + podaci | slike + podaci | slike se prevlace u stranu, pa podaci |
 
 Sto vazi svuda: padding stranice 16px, razmak u mrezi 16px, visina kartice
 **708px na svakoj sirini**, slika kartice na `opacity: .7225` preko crne (na
@@ -330,6 +330,11 @@ Stranica projekta: hero je visok `100vh` sa slikom preko cele povrsine i
 naslovom na sredini; telo pocinje 160px ispod heroja (Framer: 80px razmak
 sekcija + 64px padding + 16px unutrasnji padding) i deli se na slike (~70%) i
 podatke (~29%), sa razmakom 16px.
+
+Ispod 810px galerija prelazi u traku koja se prevlaci u stranu — `flex` red,
+`overflow-x: auto`, `scroll-snap-type: x mandatory`, stavka preko celog reda
+visine **282px**, razmak 10px. Podaci idu ispod nje. Framer to radi istim
+sredstvima (`ul.framer--carousel`), pa se mere poklapaju u piksel.
 
 Navigacija na ovim stranicama mora rucno da se digne (`.cms-nav`,
 `position: fixed`) — na Framer stranicama to radi njegov runtime, koji se ovde
@@ -377,3 +382,25 @@ ima svoj tajmer). Dva osiguraca: `<noscript>` blok u templateu i provera posle
 3s koja otkrije ono sto je stvarno u slici, ako observer zakaze.
 
 `prefers-reduced-motion: reduce` gasi sve to.
+
+## Navigacija na Framer stranicama
+
+`assets/framer-nav.js` gasi Framer-ov klijentski ruter (zasto — vidi komentar u
+fajlu). Uz to resava dve stvari koje su se videle kao "link ne radi iz prvog
+klika":
+
+- **Tap na telefonu.** Stranice koriste Lenis smooth scroll. Dok stranica jos
+  klizi po inerciji, prvi dodir cesto samo zaustavi klizanje i nikad ne postane
+  klik. Zato se tap hvata na `touchend` (pomeraj < 10px, trajanje < 700ms) i
+  vodi kao navigacija, uz `preventDefault` da ne bude i drugog, browserovog
+  klika.
+- **Kosa crta na kraju adrese.** `vercel.json` ima `trailingSlash: false`, ali
+  Framer u exportu koristi relativne linkove (`../work`). Ako se stranica ipak
+  otvori kao `/about/`, `../work` postane `/about/work` — ceo meni vodi u 404.
+  Linkovi se zato racunaju od **kanonske** putanje, ne od one iz adrese. Vercel
+  danas preusmerava takve adrese, pa se to na sajtu nije videlo; sada ne zavisi
+  od toga.
+
+Takodje se vise ne gleda `event.defaultPrevented`: ako neki drugi rukovalac
+stigne prvi i otkaze podrazumevanu radnju, to je upravo slucaj u kome bi Framer
+preuzeo navigaciju i prikazao staro stanje.
