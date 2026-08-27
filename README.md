@@ -336,6 +336,13 @@ Ispod 810px galerija prelazi u traku koja se prevlaci u stranu — `flex` red,
 visine **282px**, razmak 10px. Podaci idu ispod nje. Framer to radi istim
 sredstvima (`ul.framer--carousel`), pa se mere poklapaju u piksel.
 
+Preko dna te trake stoji pilula sa tackicama: 28px visine, 5px od dna, crna na
+20% uz `backdrop-filter: blur(4px)`, tackica 8px, neaktivna na `opacity: .5`.
+Gradi je `assets/cms.js` — jedno dugme po slici, aktivna je ona ciji je levi rub
+najblizi levom rubu okvira (racuna se iz stvarnih polozaja, pa ne zavisi od
+sirine i razmaka), a klik pomera traku na tu sliku. Zato galerija ima omotac
+`.cms-project__gallery`: tackice stoje preko nje, a same slike se pomeraju.
+
 Navigacija na ovim stranicama mora rucno da se digne (`.cms-nav`,
 `position: fixed`) — na Framer stranicama to radi njegov runtime, koji se ovde
 namerno ne ucitava. Bez toga bi traka stajala u toku i gurala stranicu 68px

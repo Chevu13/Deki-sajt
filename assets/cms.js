@@ -63,22 +63,68 @@
     }, 3000);
   }
 
-  // Gallery prev/next buttons (scroll-snap does the rest natively)
-  var track = document.querySelector("[data-cms-gallery-track]");
-  var prevBtn = document.querySelector("[data-cms-gallery-prev]");
-  var nextBtn = document.querySelector("[data-cms-gallery-next]");
-  if (track && prevBtn && nextBtn) {
-    var scrollByOne = function (dir) {
-      var item = track.querySelector("li");
-      var step = item ? item.getBoundingClientRect().width + 10 : track.clientWidth;
-      track.scrollBy({ left: dir * step, behavior: "smooth" });
-    };
-    prevBtn.addEventListener("click", function () {
-      scrollByOne(-1);
-    });
-    nextBtn.addEventListener("click", function () {
-      scrollByOne(1);
-    });
+  // Tackice ispod galerije. Na uskom ekranu se slike prevlace u stranu (vidi
+  // cms.css), pa treba pokazati na kojoj si — i omoguciti skok na bilo koju.
+  // Sam pomeraj radi `scroll-snap`; ovde se samo cita i postavlja `scrollLeft`.
+  var gallery = document.querySelector("[data-cms-gallery]");
+  var dots = document.querySelector("[data-cms-dots]");
+  if (gallery && dots) {
+    var figures = Array.prototype.slice.call(
+      gallery.querySelectorAll(".cms-project__figure")
+    );
+
+    // Jedna slika nema izmedju cega da se bira.
+    if (figures.length > 1) {
+      var buttons = figures.map(function (figure, index) {
+        var button = document.createElement("button");
+        button.type = "button";
+        button.setAttribute("aria-label", "Slika " + (index + 1));
+        button.appendChild(document.createElement("span"));
+        button.addEventListener("click", function () {
+          var delta =
+            figure.getBoundingClientRect().left - gallery.getBoundingClientRect().left;
+          gallery.scrollTo({ left: gallery.scrollLeft + delta, behavior: "smooth" });
+        });
+        dots.appendChild(button);
+        return button;
+      });
+
+      // Aktivna je ona slika ciji je levi rub najblizi levom rubu okvira —
+      // racuna se iz stvarnih polozaja, pa ne zavisi od sirine i razmaka.
+      var markActive = function () {
+        var base = gallery.getBoundingClientRect().left;
+        var best = 0;
+        var bestDistance = Infinity;
+        figures.forEach(function (figure, index) {
+          var distance = Math.abs(figure.getBoundingClientRect().left - base);
+          if (distance < bestDistance) {
+            bestDistance = distance;
+            best = index;
+          }
+        });
+        buttons.forEach(function (button, index) {
+          if (index === best) button.setAttribute("aria-current", "true");
+          else button.removeAttribute("aria-current");
+        });
+      };
+
+      var pending = false;
+      gallery.addEventListener(
+        "scroll",
+        function () {
+          if (pending) return;
+          pending = true;
+          requestAnimationFrame(function () {
+            pending = false;
+            markActive();
+          });
+        },
+        { passive: true }
+      );
+
+      window.addEventListener("resize", markActive);
+      markActive();
+    }
   }
 
 })();

@@ -269,10 +269,22 @@ body {
   padding: 160px 16px 128px;
 }
 
+/* Nosac galerije: tackice na mobilnom stoje preko nje, a same slike se
+   prevlace — pa ne mogu da budu u istom, pomerljivom okviru. */
+.cms-project__gallery {
+  position: relative;
+  min-width: 0;
+}
+
 .cms-project__media {
   display: flex;
   flex-direction: column;
   gap: 16px;
+}
+
+/* Na sirokom ekranu galerija je stubac i tackice nemaju smisla. */
+.cms-project__dots {
+  display: none;
 }
 
 /* Framer drzi visinu slike na 720px pri sirini kolone od 1087px; 3/2 pogadja
@@ -514,6 +526,64 @@ body {
     height: 282px;
     aspect-ratio: auto;
     scroll-snap-align: center;
+  }
+
+  /* Traka sa tackicama preko dna galerije — pokazuje na kojoj si slici i vodi
+     na nju. Mere su sa Framera: pilula visine 28px, 5px od dna, crna na 20% uz
+     zamucenje, tackica 8px, neaktivna na pola providnosti. */
+  .cms-project__dots {
+    position: absolute;
+    left: 50%;
+    bottom: 5px;
+    transform: translateX(-50%);
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    height: 28px;
+    border-radius: 4px;
+    background: rgba(0, 0, 0, 0.2);
+    backdrop-filter: blur(4px);
+    -webkit-backdrop-filter: blur(4px);
+  }
+
+  .cms-project__dots:empty {
+    display: none;
+  }
+
+  .cms-project__dots button {
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    height: 28px;
+    padding: 10px 4px;
+    margin: 0;
+    border: 0;
+    background: none;
+    cursor: pointer;
+    -webkit-appearance: none;
+    appearance: none;
+  }
+
+  .cms-project__dots button:first-child {
+    padding-left: 10px;
+  }
+
+  .cms-project__dots button:last-child {
+    padding-right: 10px;
+  }
+
+  .cms-project__dots span {
+    display: block;
+    width: 8px;
+    height: 8px;
+    border-radius: 50%;
+    background: rgb(255, 255, 255);
+    opacity: 0.5;
+    transition: opacity 0.2s ease;
+  }
+
+  .cms-project__dots button[aria-current="true"] span {
+    opacity: 1;
   }
 
   /* Podaci idu ispod galerije i tu stoje — nemaju uz sta da putuju, pa bi ih
