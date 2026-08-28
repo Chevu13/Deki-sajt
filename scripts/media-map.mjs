@@ -118,6 +118,21 @@ const FRAMER_PAGES = [
 
 const NAV_SCRIPT = '<script src="/assets/framer-nav.js" defer></script>';
 
+// Naslovna i About drze slike koje se menjaju iz panela. Framer ih secka po
+// okviru zadate visine; ovaj skript ih vraca u celinu (vidi komentar u fajlu).
+const MEDIA_SCRIPT = '<script src="/assets/framer-media.js" defer></script>';
+
+function ensureMediaScript(file) {
+  const full = path.join(ROOT, file);
+  if (!fs.existsSync(full)) return false;
+
+  const html = fs.readFileSync(full, "utf8");
+  if (html.includes("/assets/framer-media.js")) return false;
+
+  fs.writeFileSync(full, html.replace("</body>", MEDIA_SCRIPT + "\n</body>"), "utf8");
+  return true;
+}
+
 function ensureNavScript(file) {
   const full = path.join(ROOT, file);
   if (!fs.existsSync(full)) return false;
@@ -373,6 +388,11 @@ function main() {
   const patched = FRAMER_PAGES.filter(ensureNavScript);
   console.log(
     `\n— navigacija —\nframer-nav.js: ${patched.length ? "dodat u " + patched.join(", ") : "vec svuda"}`
+  );
+
+  const media = PAGES.map((page) => page.file).filter(ensureMediaScript);
+  console.log(
+    `framer-media.js: ${media.length ? "dodat u " + media.join(", ") : "vec svuda"}`
   );
 
   console.log("\nnapisano: content/legacy-images.json, content/pages.json");
