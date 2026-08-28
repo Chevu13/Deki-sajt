@@ -360,6 +360,34 @@ ${body}
 // Naslovna nije generisana. Framer je na nju stavio cetiri izabrana rada i to
 // je urednicki izbor, ne cela lista — /work je ta lista. Novi projekti se zato
 // na naslovnoj ne pojavljuju sami.
+// Kad se projektu promeni slug — kolega je npr. ispravio "Hibbernate" u
+// "Hibernate" — build napravi novu stranicu, a stara ostane da visi na svom
+// URL-u kao duplikat. Zato se brisu stranice u work/ koje vise nemaju svoj
+// projekat.
+//
+// Brise se SAMO ono sto je ovaj skript i napravio: prepoznaje se po `cms-main`,
+// koji postoji jedino u nasem template-u. Originalne Framer stranice tako ne
+// mogu da nastradaju ni ako im projekat privremeno nestane sa spiska (npr. kad
+// se prebaci na Draft).
+function pruneOrphans(slugs) {
+  const dir = path.join(ROOT, "work");
+  if (!fs.existsSync(dir)) return [];
+
+  const keep = new Set(slugs);
+  const removed = [];
+
+  for (const entry of fs.readdirSync(dir, { withFileTypes: true })) {
+    if (!entry.isDirectory() || keep.has(entry.name)) continue;
+
+    const page = path.join(dir, entry.name, "index.html");
+    if (!readIfExists(page).includes('class="cms-main"')) continue;
+
+    fs.rmSync(path.join(dir, entry.name), { recursive: true, force: true });
+    removed.push(entry.name);
+  }
+  return removed;
+}
+
 function main() {
   const cmsProjects = loadProjects();
   const legacyProjects = loadLegacyProjects();
@@ -395,6 +423,9 @@ function main() {
     `built  work/index.html (${listedProjects.length} kartica, ` +
       `${allProjects.length - listedProjects.length} nelistirano)`
   );
+
+  const orphans = pruneOrphans(cmsProjects.map((p) => p.slug));
+  if (orphans.length) console.log(`obrisano work/${orphans.join(", work/")} (nema projekat)`);
 
   const sitemap = buildSitemap(listedProjects);
   fs.writeFileSync(SITEMAP_FILE, sitemap, "utf8");

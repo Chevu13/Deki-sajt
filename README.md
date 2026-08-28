@@ -451,6 +451,18 @@ Takodje se vise ne gleda `event.defaultPrevented`: ako neki drugi rukovalac
 stigne prvi i otkaze podrazumevanu radnju, to je upravo slucaj u kome bi Framer
 preuzeo navigaciju i prikazao staro stanje.
 
+## Preimenovanje projekta
+
+Kad se projektu promeni slug (kolega je npr. ispravio "Hibbernate" u
+"Hibernate"), build napravi novu stranicu — a stara je ostajala da visi na svom
+URL-u kao duplikat, i u Google-u i na sajtu.
+
+`scripts/build.mjs` sada brise stranice u `work/` koje vise nemaju svoj
+projekat. Brise **samo ono sto je sam napravio**: prepoznaje se po `cms-main`,
+koji postoji jedino u nasem template-u. Originalnih sest Framer stranica tako ne
+moze da nastrada ni ako im projekat privremeno nestane sa spiska — provereno
+tako sto je jedan od njih prebacen na Draft, pa je stranica ostala.
+
 ## Slike na stranici projekta
 
 Svaka slika — i hero i one u galeriji — stoji u okviru koji uzima **odnos same
