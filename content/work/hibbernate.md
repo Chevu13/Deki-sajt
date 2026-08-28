@@ -1,7 +1,7 @@
 ---
 title: 'Hibbernate '
 slug: hibbernate
-status: Draft
+status: Live
 year: 2018
 services:
   - Branding
