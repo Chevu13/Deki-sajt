@@ -415,42 +415,46 @@ preuzeo navigaciju i prikazao staro stanje.
 
 ## Slike na naslovnoj i About stranici
 
-Framer svaku od tih fotografija stavlja u okvir zadate visine, secka je sa
-`object-fit: cover` i uz to je JOS uveca — `scale(1.2)` na heroju, `scale(1.4)`
-na About-u — pa je pomera gore-dole uz skrol.
+Framer svaku od tih fotografija stavlja u okvir ZADATE visine, secka je sa
+`object-fit: cover` i uz to je jos uveca — `scale(1.2)` na heroju, `scale(1.4)`
+na About-u — pa je pomera gore-dole uz skrol. Dok su slike birane uz taj okvir
+izgledalo je namerno; prva fotografija drugog odnosa stranica ubacena kroz panel
+ostala je bez glave i bez dna.
 
-To uvecanje je cist gubitak kadra: sa `scale(1.4)` se od okvira vidi jedva 70%,
-i to pomereno. Dok su slike birane uz taj okvir izgledalo je namerno; prva
-fotografija drugog odnosa stranica ubacena kroz panel ostala je bez glave i bez
-dna.
+`assets/framer-media.js` (ide samo u `index.html` i `about/index.html`):
 
-`assets/framer-media.js` (ide samo u `index.html` i `about/index.html`) sklanja
-samo to — uvecanje i pomeranje. Slika ostaje `cover` i centrirana, dakle od
-ivice do ivice okvira kako je i bila; vidi se najveci isecak koji okvir dopusta.
-Na 2560px se tako od tri About slike vidi 78% / 70% / 50% visine, umesto
-56% / 50% / 36% pre toga.
+- **Svuda** — sklanja uvecanje i pomeranje. To je cist gubitak kadra: sa
+  `scale(1.4)` se od okvira vidi jedva 70%, i to pomereno.
+- **About** — okviru pusta visinu da **prati odnos same fotografije**. Slika ide
+  od ivice do ivice i vidi se cela, na svakoj sirini. Odnos se cita iz ucitane
+  slike; dok nije ucitana (slike nize su `loading="lazy"`) uzimaju se
+  `width`/`height` atributi, pa stranica ne poskoci kad slika stigne.
+- **Hero** — zadrzava `cover`, samo bez uvecanja i pomeranja.
 
-Probano pa odbaceno, da se ne vrti u krug:
+Zasto hero ne moze isto: preko njega stoji naslov, apsolutno pozicioniran u
+odnosu na okvir visok ceo ekran. Ako mu se visina pusti, na telefonu ispadne
+traka od ~190px i naslov se prelije van nje (probano). Ako se fotografija uklopi
+cela u tako visok okvir (`contain`), ostane pola ekrana prazno.
 
-| pokusaj | zasto ne |
-|---|---|
-| `contain` (cela slika u okviru) | na velikom monitoru siroke prazne trake sa strane |
-| visina okvira prati odnos slike | naslov preko heroja je apsolutan u odnosu na okvir visok ceo ekran, pa se na telefonu prelije van |
-| kadar zakacen za vrh | spasava glavu na jednoj slici, ali drugoj (grad na obali) ostavi samo nebo |
+Sto je jos probano pa odbaceno: `contain` na About-u (na velikom monitoru siroke
+prazne trake sa strane) i kadar zakacen za vrh (spasava glavu na jednoj slici,
+ali gradu na obali ostavi samo nebo).
 
 Slike se biraju po strukturi, ne po imenu fajla: slika u Framer-ovom omotacu
 pozadinske slike, sa `object-fit: cover`, koja **nije** u linku. Time ispadaju
-kartice projekata na naslovnoj (linkovi su, i kadriranje im je u redu) i potpis
-(vec je `contain`).
+kartice projekata na naslovnoj (linkovi su, i kadriranje im je u redu), logo u
+navigaciji i potpis.
 
-Dve zamke:
+Tri zamke:
 
-- Framer inline stil prepisuje na svakom kadru, pa pravilo ide kroz stylesheet
-  sa `!important` — samo tako nadjacava inline vrednost koju on stalno vraca.
-- Na sirokim ekranima Framer menja varijantu sekcije, pa oznake odu sa starim
-  cvorovima. Vraca ih `MutationObserver`, i to preko tajmera a ne
-  `requestAnimationFrame` — rAF ume da bude uspavan dok se kartica ne iscrtava.
+- Framer inline stil prepisuje na svakom kadru, pa pravila idu kroz stylesheet
+  sa `!important` — samo tako nadjacaju inline vrednost koju on stalno vraca.
+- Framer visinu zakiva i na svim omotacima iznad slike — i na sekciji, i na redu
+  sa dve slike. Svima se pusta, ali penjanje staje kad omotac postane 3x visi od
+  slike: tu je vec kraj sekcije i pocinje ostatak stranice.
+- Sam okvir sa slikom je apsolutan; njemu se visina ne pusta na `auto` (sklopio
+  bi se na nulu) nego se razapinje po roditelju, koji nosi odnos.
 
-> Ako neka buduca fotografija i uz ovo bude losa u kadru, resenje je polje
-> **Kadar** kao kod projekata (`hero_focus`), samo prosireno na Pages deo
-> panela.
+Na sirokim ekranima Framer menja varijantu sekcije, pa oznake odu sa starim
+cvorovima. Vraca ih `MutationObserver`, preko tajmera a ne
+`requestAnimationFrame` — rAF ume da bude uspavan dok se kartica ne iscrtava.
