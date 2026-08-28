@@ -242,12 +242,50 @@ Ovo ne dira `/work` listu niti CMS projekte.
 > treba ih ponovo dodati ili preuzeti iz git istorije.
 
 
+## Kontakt forma
+
+Framer export nosi formu bez `action`: u originalu ju je primao Framer-ov
+hosting, koji van Framera ne postoji, pa je dugme "Submit" bilo mrtvo.
+
+Sada ide ovako:
+
+    contact/index.html  ->  assets/contact-form.js  ->  api/contact.js  ->  Resend  ->  hi@dtumenko.com
+
+- `assets/contact-form.js` presrece slanje i salje JSON na `/api/contact`.
+  Polja se citaju po **placeholder**-u, ne po `name`: Framer je u export izvezao
+  pokvarene atribute — i prezime, i imejl, i telefon nose `name="Last Name"`.
+- `api/contact.js` proverava podatke i salje mejl. Adresa posetioca ide u
+  `reply_to`, pa se odgovara obicnim Reply. Nevidljiva polja koja Framer vec ima
+  u formi (`website`, `company`, …) sluze kao zamka za botove: ako je bilo koje
+  popunjeno, poruka se tiho odbacuje.
+
+### Sta treba podesiti (jednom)
+
+1. Napraviti nalog na [resend.com](https://resend.com) — free plan je 3.000
+   poruka mesecno.
+2. U Resend-u dodati domen `dtumenko.com` i uneti DNS zapise koje da (isti panel
+   gde je i domen za Vercel). Bez toga poruke mogu da idu samo na adresu kojom je
+   nalog otvoren.
+3. U Vercel-u, Settings -> Environment Variables, dodati:
+
+   | promenljiva | vrednost |
+   |---|---|
+   | `RESEND_API_KEY` | kljuc iz Resend-a (`re_…`) |
+   | `CONTACT_FROM` | `Sajt <forma@dtumenko.com>` — mora biti sa potvrdjenog domena |
+   | `CONTACT_TO` | `hi@dtumenko.com` (podrazumevano i bez ove promenljive) |
+
+4. Redeploy.
+
+Dok kljuc ne postoji, forma posetiocu kaze "Slanje trenutno nije podeseno" i
+razlog upisuje u Vercel logove — ne pretvara se da je poslala.
+
+> Newsletter forma u podnozju je i dalje bez `action`. Ako i ona treba da salje,
+> vezuje se na isti endpoint.
+
 ## Poznato ograničenje
 
-Newsletter forma (footer) i Contact forma nemaju definisan `action` — u originalu
-ih je submit-ovao Framer-ov hosting backend, koji ne postoji van Framer-a. Da bi
-radile na Vercel-u, treba ih povezati na servis kao Formspree, Getform ili
-sopstveni API endpoint (dodavanjem `action="..."` i/ili malo JS-a).
+Sve slike iz `assets/images/` se deploy-uju, ukljucujuci i one koje stranice ne
+koriste.
 
 ## Popravke — /work fatal error i ucitavanje slika (avg 2026)
 

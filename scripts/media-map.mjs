@@ -122,6 +122,21 @@ const NAV_SCRIPT = '<script src="/assets/framer-nav.js" defer></script>';
 // okviru zadate visine; ovaj skript ih vraca u celinu (vidi komentar u fajlu).
 const MEDIA_SCRIPT = '<script src="/assets/framer-media.js" defer></script>';
 
+// Kontakt forma iz Framer exporta nema `action` — ovaj skript je vezuje za
+// api/contact.js (vidi komentar u fajlu).
+const CONTACT_SCRIPT = '<script src="/assets/contact-form.js" defer></script>';
+
+function ensureContactScript(file) {
+  const full = path.join(ROOT, file);
+  if (!fs.existsSync(full)) return false;
+
+  const html = fs.readFileSync(full, "utf8");
+  if (html.includes("/assets/contact-form.js")) return false;
+
+  fs.writeFileSync(full, html.replace("</body>", CONTACT_SCRIPT + "\n</body>"), "utf8");
+  return true;
+}
+
 function ensureMediaScript(file) {
   const full = path.join(ROOT, file);
   if (!fs.existsSync(full)) return false;
@@ -393,6 +408,11 @@ function main() {
   const media = PAGES.map((page) => page.file).filter(ensureMediaScript);
   console.log(
     `framer-media.js: ${media.length ? "dodat u " + media.join(", ") : "vec svuda"}`
+  );
+
+  const contact = ["contact/index.html"].filter(ensureContactScript);
+  console.log(
+    `contact-form.js: ${contact.length ? "dodat u " + contact.join(", ") : "vec svuda"}`
   );
 
   console.log("\nnapisano: content/legacy-images.json, content/pages.json");
