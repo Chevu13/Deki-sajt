@@ -35,6 +35,100 @@ function focusPosition(focus) {
   return "center center";
 }
 
+// Odnos stranica slike, procitan iz samog fajla.
+//
+// Bez ovoga bi svaka slika isla u okvir zadate visine i secla se: prvi projekat
+// je imao fotografije 3:2 pa se nije primetilo, sledeci ih je imao 1.70 i sve su
+// bile posecene sa strane. Okvir zato uzima odnos SAME slike, pa nema sta da se
+// sece — a posto se odnos zna vec pri build-u, mesto je rezervisano unapred i
+// stranica ne poskoci kad se slika ucita.
+//
+// Citaju se zaglavlja JPEG/PNG/GIF/WebP fajlova; ako format nije prepoznat,
+// vraca se null i okvir se prepusta samoj slici (`height: auto`), sto je i dalje
+// bez secenja, samo uz mali skok pri ucitavanju.
+function imageSize(src) {
+  if (!src || !src.startsWith("/")) return null;
+  const file = path.join(ROOT, src.slice(1));
+  if (!fs.existsSync(file)) return null;
+
+  let buf;
+  try {
+    buf = fs.readFileSync(file);
+  } catch (err) {
+    return null;
+  }
+
+  // PNG
+  if (buf.length > 24 && buf.readUInt32BE(0) === 0x89504e47) {
+    return { width: buf.readUInt32BE(16), height: buf.readUInt32BE(20) };
+  }
+
+  // GIF
+  if (buf.length > 10 && buf.toString("ascii", 0, 3) === "GIF") {
+    return { width: buf.readUInt16LE(6), height: buf.readUInt16LE(8) };
+  }
+
+  // WebP — tri varijante zaglavlja (lossy, lossless, prosireni)
+  if (buf.length > 30 && buf.toString("ascii", 0, 4) === "RIFF" && buf.toString("ascii", 8, 12) === "WEBP") {
+    const kind = buf.toString("ascii", 12, 16);
+    if (kind === "VP8 ") {
+      return { width: buf.readUInt16LE(26) & 0x3fff, height: buf.readUInt16LE(28) & 0x3fff };
+    }
+    if (kind === "VP8L") {
+      const bits = buf.readUInt32LE(21);
+      return { width: (bits & 0x3fff) + 1, height: ((bits >> 14) & 0x3fff) + 1 };
+    }
+    if (kind === "VP8X") {
+      const width = 1 + (buf[24] | (buf[25] << 8) | (buf[26] << 16));
+      const height = 1 + (buf[27] | (buf[28] << 8) | (buf[29] << 16));
+      return { width, height };
+    }
+    return null;
+  }
+
+  // JPEG — trazi se SOF segment sa dimenzijama
+  if (buf.length > 4 && buf[0] === 0xff && buf[1] === 0xd8) {
+    let i = 2;
+    while (i < buf.length - 9) {
+      if (buf[i] !== 0xff) {
+        i += 1;
+        continue;
+      }
+      const marker = buf[i + 1];
+      if (marker === 0xd8 || marker === 0x01 || (marker >= 0xd0 && marker <= 0xd7)) {
+        i += 2;
+        continue;
+      }
+      const length = buf.readUInt16BE(i + 2);
+      const isSOF =
+        (marker >= 0xc0 && marker <= 0xc3) ||
+        (marker >= 0xc5 && marker <= 0xc7) ||
+        (marker >= 0xc9 && marker <= 0xcb) ||
+        (marker >= 0xcd && marker <= 0xcf);
+      if (isSOF) {
+        return { width: buf.readUInt16BE(i + 7), height: buf.readUInt16BE(i + 5) };
+      }
+      i += 2 + length;
+    }
+  }
+
+  return null;
+}
+
+// Inline stil sa odnosom stranica; prazan string kad se dimenzije ne znaju.
+function ratioStyle(src) {
+  const size = imageSize(src);
+  if (!size || !size.width || !size.height) return "";
+  return ` style="aspect-ratio:${size.width} / ${size.height}"`;
+}
+
+// Hero uzima odnos svoje slike kad se zna; klasa je tu da CSS moze da razlikuje
+// ta dva slucaja, jer bez poznatog odnosa mora da ostane visok ceo ekran.
+function heroAttrs(src) {
+  const ratio = ratioStyle(src);
+  return ratio ? ` class="cms-hero cms-hero--fit"${ratio}` : ' class="cms-hero"';
+}
+
 function readIfExists(file) {
   return fs.existsSync(file) ? fs.readFileSync(file, "utf8") : "";
 }
@@ -83,9 +177,9 @@ function renderGalleryItems(gallery) {
   return gallery
     .map((item) => {
       if (item.type === "video") {
-        return `      <div class="cms-project__figure" data-cms-reveal><video src="${escapeHtml(item.src)}" muted loop playsinline controls preload="metadata"></video></div>`;
+        return `      <div class="cms-project__figure" data-cms-reveal${ratioStyle(item.src)}><video src="${escapeHtml(item.src)}" muted loop playsinline controls preload="metadata"></video></div>`;
       }
-      return `      <div class="cms-project__figure" data-cms-reveal><img src="${escapeHtml(item.src)}" alt="${escapeHtml(item.alt || "")}" loading="lazy"></div>`;
+      return `      <div class="cms-project__figure" data-cms-reveal${ratioStyle(item.src)}><img src="${escapeHtml(item.src)}" alt="${escapeHtml(item.alt || "")}" loading="lazy"></div>`;
     })
     .join("\n");
 }
@@ -147,6 +241,7 @@ function buildWorkItemPage(project, partials) {
     .replace(/\{\{TITLE\}\}/g, escapeHtml(project.title))
     .replace("{{HERO_IMAGE}}", escapeHtml(project.hero_image || ""))
     .replace("{{HERO_FOCUS}}", focusPosition(project.hero_focus))
+    .replace("{{HERO_ATTRS}}", heroAttrs(project.hero_image))
     .replace("{{GALLERY_ITEMS}}", renderGalleryItems(project.gallery))
     .replace("{{YEAR}}", escapeHtml(project.year || ""))
     .replace("{{SERVICE_LIST}}", renderServiceList(project.services))

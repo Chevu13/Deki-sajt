@@ -413,6 +413,34 @@ Takodje se vise ne gleda `event.defaultPrevented`: ako neki drugi rukovalac
 stigne prvi i otkaze podrazumevanu radnju, to je upravo slucaj u kome bi Framer
 preuzeo navigaciju i prikazao staro stanje.
 
+## Slike na stranici projekta
+
+Svaka slika — i hero i one u galeriji — stoji u okviru koji uzima **odnos same
+te slike**. Odnos meri `scripts/build.mjs` citajuci zaglavlje fajla
+(JPEG/PNG/GIF/WebP) i upisuje ga kao `aspect-ratio` u samu stranicu, pa je mesto
+rezervisano pre nego sto se slika ucita i stranica ne poskoci.
+
+Zato ovde nema fiksnih odnosa u CSS-u. Ranije je stajalo `aspect-ratio: 3 / 2`
+uz `object-fit: cover`: prvi projekat je imao fotografije 3:2 pa se nije
+primetilo, sledeci ih je imao 1.70 i sve su bile posecene sa strane. Sada je
+pravilo isto za svaki projekat koji se doda kroz panel, bez obzira na oblik
+fotografija — ukljucujuci i uspravne.
+
+Ako se odnos ne moze procitati (nepoznat format), okvir ostaje bez zadatog
+odnosa a slika je `height: auto` — i dalje se vidi cela, samo uz mali skok pri
+ucitavanju.
+
+Hero: kad se odnos zna, dobija klasu `cms-hero--fit` i visina mu prati sliku;
+`min-height: min-content` cuva da nikad ne bude nizi od naslova koji stoji preko
+njega. Kad se odnos ne zna, ostaje visok ceo ekran kao ranije.
+
+Na uskom ekranu galerija je traka koja se prevlaci: svaka slika zadrzava svoju
+visinu, traka je visoka koliko najvisa, nize stoje na sredini.
+
+> Kartice na `/work` su namerno drugacije: one su 708px visoke sa `cover`, jer
+> je to Framer-ov raspored kartice. Kadar tamo bira polje **Kadar**
+> (`hero_focus`) u panelu.
+
 ## Slike na naslovnoj i About stranici
 
 Framer svaku od tih fotografija stavlja u okvir ZADATE visine, secka je sa

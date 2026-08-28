@@ -175,8 +175,10 @@ body {
 
 /* --------------------------------------------------- /work/<slug> — hero --- */
 
-/* Hero je visok kao ceo ekran, slika ide preko cele povrsine, a "View All" i
-   naslov stoje na sredini, uz levu ivicu. */
+/* Hero: slika preko cele povrsine, a "View All" i naslov stoje na sredini, uz
+   levu ivicu. Visina je ceo ekran samo kad se odnos slike ne zna — inace okvir
+   uzima odnos same fotografije (`cms-hero--fit`, upisuje ga scripts/build.mjs),
+   pa se hero slika vidi cela kao i one u galeriji. */
 .cms-hero {
   position: relative;
   display: flex;
@@ -192,6 +194,13 @@ body {
 
 /* Slika je na 80% preko crne — tako je i na Frameru, da bi tekst preko nje bio
    citljiv bez zasebnog sloja za zatamnjenje. */
+/* Naslov i link su u toku, pa `min-content` cuva da hero nikad ne bude nizi od
+   njih — i kod vrlo siroke fotografije na uskom ekranu. */
+.cms-hero--fit {
+  height: auto;
+  min-height: min-content;
+}
+
 .cms-hero__media {
   position: absolute;
   inset: 0;
@@ -287,10 +296,15 @@ body {
   display: none;
 }
 
-/* Framer drzi visinu slike na 720px pri sirini kolone od 1087px; 3/2 pogadja
-   isti odnos, a za razliku od fiksne visine ostaje tacan i na uzem ekranu. */
+/* Okvir NEMA zadat odnos: `aspect-ratio` mu upisuje scripts/build.mjs, procitan
+   iz same slike, samo da bi mesto bilo rezervisano pre nego sto se slika ucita.
+   Visina slike je `auto`, pa se svaka vidi cela bez obzira na oblik — i kad se
+   odnos ne moze procitati.
+
+   Ranije je ovde stajalo `aspect-ratio: 3 / 2` uz `object-fit: cover`. Prvi
+   projekat je imao fotografije 3:2 pa se nije primetilo; sledeci ih je imao
+   1.70 i sve su bile posecene sa strane. */
 .cms-project__figure {
-  aspect-ratio: 3 / 2;
   overflow: hidden;
   background: rgb(29, 29, 29);
 }
@@ -298,8 +312,7 @@ body {
 .cms-project__figure img,
 .cms-project__figure video {
   width: 100%;
-  height: 100%;
-  object-fit: cover;
+  height: auto;
   display: block;
 }
 
@@ -509,6 +522,7 @@ body {
      `overflow-x: auto` i `scroll-snap`, sa visinom stavke od 282px. */
   .cms-project__media {
     flex-direction: row;
+    align-items: center;
     gap: 10px;
     overflow-x: auto;
     overflow-y: hidden;
@@ -521,10 +535,12 @@ body {
     display: none;
   }
 
+  /* U traci svaka slika ostaje svoje visine; traka je visoka koliko najvisa, a
+     nize stoje na sredini. Framer ovde drzi fiksnih 282px, ali to secka sve sto
+     nije njegovog oblika. */
   .cms-project__figure {
     flex: 0 0 100%;
-    height: 282px;
-    aspect-ratio: auto;
+    align-self: center;
     scroll-snap-align: center;
   }
 
