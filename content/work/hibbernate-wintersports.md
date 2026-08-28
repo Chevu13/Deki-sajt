@@ -1,7 +1,7 @@
 ---
 title: Hibbernate Wintersports
 slug: hibbernate-wintersports
-status: Draft
+status: Live
 year: 2018
 services:
   - Brand Identity
