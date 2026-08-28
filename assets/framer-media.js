@@ -1,31 +1,28 @@
-/* Slike na naslovnoj i About stranici — da ih Framer ne secka.
+/* Slike na naslovnoj i About stranici — da ih Framer ne secka bez potrebe.
  *
- * Framer svaku takvu fotografiju stavlja u okvir zadate visine, uveca je
- * (`scale(1.2)` na heroju, `scale(1.4)` na About-u), pomera uz skrol i secka sa
- * `object-fit: cover`. Dok su slike birane uz taj okvir to je izgledalo
- * namerno; cim se kroz panel ubaci fotografija drugog odnosa stranica, secenje
- * pojede ono sto je vazno — glavu, dno, sta zatekne.
+ * Framer svaku od tih fotografija stavlja u okvir zadate visine, secka je sa
+ * `object-fit: cover` i uz to je JOS uveca — `scale(1.2)` na heroju,
+ * `scale(1.4)` na About-u — pa je pomera gore-dole uz skrol.
  *
- * Uvecanje i pomeranje se sklanjaju svuda: ona su cist gubitak kadra. Sa
- * `scale(1.4)` se vidi jedva 70% okvira, i to pomereno gore-dole uz skrol.
+ * To uvecanje je cist gubitak kadra: sa `scale(1.4)` se od okvira vidi jedva
+ * 70%, i to pomereno. Dok su slike birane uz taj okvir izgledalo je namerno;
+ * prva fotografija drugog odnosa stranica ubacena kroz panel ostala je bez
+ * glave i bez dna.
  *
- * Dalje se ta dva mesta razlikuju:
+ * Ovde se sklanja samo to — uvecanje i pomeranje. Slika ostaje `cover`, dakle
+ * od ivice do ivice okvira, i centrirana, kako je i bila. Time se vidi najveci
+ * moguci isecak koji okvir dopusta, na svakoj sirini ekrana.
  *
- *   About  — slike stoje u mrezi cije su visine deo dizajna. Fotografija se
- *            uklapa unutra CELA (`contain`), sa pozadinom sajta oko sebe. To je
- *            tacno ono sto je trazeno: nista se ne secka, ni na telefonu ni na
- *            4K ekranu.
+ * Probano pa odbaceno:
+ *   - `contain` (cela slika u okviru): na velikom monitoru ostaju siroke prazne
+ *     trake sa strane, jer okvir postaje mnogo siri od fotografije.
+ *   - visina okvira da prati odnos fotografije: na heroju naslov stoji apsolutno
+ *     u odnosu na okvir visok ceo ekran, pa se na telefonu prelije van njega.
+ *   - kadar zakacen za vrh: spasava glavu na jednoj slici, ali drugoj (grad na
+ *     obali, motiv u donjoj polovini) ostavi samo nebo.
  *
- *   Hero   — preko njega stoji naslov, apsolutno pozicioniran u odnosu na okvir
- *            visok ceo ekran. Probano: ako se okviru pusti visina da prati odnos
- *            fotografije, na telefonu ispadne traka od ~190px i tekst se prelije
- *            van nje. Ako se fotografija uklopi cela u tako visok okvir, ostane
- *            pola ekrana prazno. Zato hero zadrzava `cover` — ali bez uvecanja i
- *            pomeranja, pa se vidi najveci i centriran isecak koji okvir
- *            dopusta.
- *
- * Framer inline stil prepisuje na svakom kadru, pa pravila moraju da idu kroz
- * stylesheet sa `!important`: samo tako nadjacaju inline vrednost koju on stalno
+ * Framer inline stil prepisuje na svakom kadru, pa pravilo mora da ide kroz
+ * stylesheet sa `!important`: samo tako nadjacava inline vrednost koju on stalno
  * vraca.
  */
 
@@ -33,13 +30,7 @@
   "use strict";
 
   var STYLE_ID = "cms-media-style";
-  var CSS =
-    "[data-cms-media]{transform:none!important}" +
-    '[data-cms-media="fit"] img{object-fit:contain!important;' +
-    // assets/lqip.css stavlja zamucenu sitnu verziju slike kao background
-    // SAME slike. Uz `cover` se ne vidi, ali uz `contain` bi ispunila trake sa
-    // strane — a to je pikselizovan razmaz. Trake ostaju u boji stranice.
-    "object-position:center center!important;background-image:none!important}";
+  var CSS = "[data-cms-media]{transform:none!important}";
 
   function ensureStyle() {
     if (document.getElementById(STYLE_ID)) return;
@@ -73,29 +64,30 @@
 
     candidates().forEach(function (img) {
       var box = boxFor(img);
-      if (!box || box.hasAttribute("data-cms-media")) return;
-      box.setAttribute("data-cms-media", img.closest("header") ? "frame" : "fit");
+      if (box && !box.hasAttribute("data-cms-media")) box.setAttribute("data-cms-media", "");
     });
   }
 
   function start() {
     apply();
 
-    // Framer posle hidracije zna da prezida deo stranice; tada se oznake gube,
-    // pa se postavljaju ponovo. Ista provera hvata i sliku zamenjenu iz panela.
     if (window.MutationObserver) {
+      // Namerno tajmer, ne requestAnimationFrame: Framer na sirokim ekranima
+      // menja varijantu sekcije, pa oznake odu sa starim cvorovima i moraju
+      // nazad — a rAF ume da bude uspavan dok se kartica ne iscrtava.
       var pending = false;
       new MutationObserver(function () {
         if (pending) return;
         pending = true;
-        requestAnimationFrame(function () {
+        setTimeout(function () {
           pending = false;
           apply();
-        });
+        }, 60);
       }).observe(document.body, { childList: true, subtree: true });
     }
 
     window.addEventListener("load", apply);
+    window.addEventListener("resize", apply);
   }
 
   if (document.readyState === "loading") {

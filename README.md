@@ -415,34 +415,42 @@ preuzeo navigaciju i prikazao staro stanje.
 
 ## Slike na naslovnoj i About stranici
 
-Framer svaku od tih fotografija stavlja u okvir zadate visine, uveca je
-(`scale(1.2)` na heroju, `scale(1.4)` na About-u), pomera uz skrol i secka sa
-`object-fit: cover`. Dok su slike birane uz taj okvir to je izgledalo namerno;
-prva fotografija drugog odnosa stranica ubacena kroz panel ostala je bez glave i
-bez dna.
+Framer svaku od tih fotografija stavlja u okvir zadate visine, secka je sa
+`object-fit: cover` i uz to je JOS uveca — `scale(1.2)` na heroju, `scale(1.4)`
+na About-u — pa je pomera gore-dole uz skrol.
 
-`assets/framer-media.js` (ide samo u `index.html` i `about/index.html`) to
-resava. Uvecanje i pomeranje se sklanjaju svuda — cist su gubitak kadra: sa
-`scale(1.4)` se vidi jedva 70% okvira. Dalje:
+To uvecanje je cist gubitak kadra: sa `scale(1.4)` se od okvira vidi jedva 70%,
+i to pomereno. Dok su slike birane uz taj okvir izgledalo je namerno; prva
+fotografija drugog odnosa stranica ubacena kroz panel ostala je bez glave i bez
+dna.
 
-- **About** — fotografija se uklapa u okvir CELA (`contain`), sa pozadinom
-  stranice oko sebe. Visine okvira su deo dizajna mreze i ostaju.
-- **Hero** — zadrzava `cover`, ali bez uvecanja i pomeranja, pa se vidi najveci
-  i centriran isecak koji okvir dopusta. Probano je i drugacije: ako okviru
-  pustis visinu da prati odnos fotografije, na telefonu ispadne traka od ~190px
-  a naslov preko nje se prelije van (apsolutno je pozicioniran u odnosu na okvir
-  visok ceo ekran); ako se fotografija uklopi cela u tako visok okvir, ostane
-  pola ekrana prazno.
+`assets/framer-media.js` (ide samo u `index.html` i `about/index.html`) sklanja
+samo to — uvecanje i pomeranje. Slika ostaje `cover` i centrirana, dakle od
+ivice do ivice okvira kako je i bila; vidi se najveci isecak koji okvir dopusta.
+Na 2560px se tako od tri About slike vidi 78% / 70% / 50% visine, umesto
+56% / 50% / 36% pre toga.
 
-Bira se po strukturi, ne po imenu fajla: slika u Framer-ovom omotacu pozadinske
-slike, sa `object-fit: cover`, koja **nije** u linku. Time ispadaju kartice
-projekata na naslovnoj (one su linkovi i njihovo kadriranje je u redu) i potpis
-(vec je `contain`). Hero se prepoznaje po tome sto je u `<header>`.
+Probano pa odbaceno, da se ne vrti u krug:
+
+| pokusaj | zasto ne |
+|---|---|
+| `contain` (cela slika u okviru) | na velikom monitoru siroke prazne trake sa strane |
+| visina okvira prati odnos slike | naslov preko heroja je apsolutan u odnosu na okvir visok ceo ekran, pa se na telefonu prelije van |
+| kadar zakacen za vrh | spasava glavu na jednoj slici, ali drugoj (grad na obali) ostavi samo nebo |
+
+Slike se biraju po strukturi, ne po imenu fajla: slika u Framer-ovom omotacu
+pozadinske slike, sa `object-fit: cover`, koja **nije** u linku. Time ispadaju
+kartice projekata na naslovnoj (linkovi su, i kadriranje im je u redu) i potpis
+(vec je `contain`).
 
 Dve zamke:
 
-- Framer inline stil prepisuje na svakom kadru, pa pravila idu kroz stylesheet
-  sa `!important` — samo tako nadjacaju inline vrednost koju on stalno vraca.
-- `assets/lqip.css` stavlja zamucenu sitnu verziju slike kao `background-image`
-  same slike. Uz `cover` se ne vidi, ali uz `contain` bi ispunila trake sa
-  strane pikselizovanim razmazom, pa se gasi.
+- Framer inline stil prepisuje na svakom kadru, pa pravilo ide kroz stylesheet
+  sa `!important` — samo tako nadjacava inline vrednost koju on stalno vraca.
+- Na sirokim ekranima Framer menja varijantu sekcije, pa oznake odu sa starim
+  cvorovima. Vraca ih `MutationObserver`, i to preko tajmera a ne
+  `requestAnimationFrame` — rAF ume da bude uspavan dok se kartica ne iscrtava.
+
+> Ako neka buduca fotografija i uz ovo bude losa u kadru, resenje je polje
+> **Kadar** kao kod projekata (`hero_focus`), samo prosireno na Pages deo
+> panela.
