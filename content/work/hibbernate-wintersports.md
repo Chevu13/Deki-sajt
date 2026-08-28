@@ -13,34 +13,31 @@ hero_image: /assets/uploads/mtcwey75-mockup-2.jpg
 hero_focus: center
 gallery:
   - type: image
-    src: /assets/uploads/mtcx0r99-6-0-5x.jpg
+    src: /assets/uploads/mtcxciv8-logo-2.jpg
     alt: ''
   - type: image
-    src: /assets/uploads/mtcx0vov-2-0-5x.jpg
+    src: /assets/uploads/mtcxcn5y-colors.jpg
     alt: ''
   - type: image
-    src: /assets/uploads/mtcx0y0p-1-0-5x.jpg
+    src: /assets/uploads/mtcxcq7r-artboard-1.jpg
     alt: ''
   - type: image
-    src: /assets/uploads/mtcx14y7-3-0-5x.jpg
+    src: /assets/uploads/mtcxcs2j-typography.jpg
     alt: ''
   - type: image
-    src: /assets/uploads/mtcx19vr-4-0-5x.jpg
+    src: /assets/uploads/mtcxcxwt-versions.jpg
     alt: ''
   - type: image
-    src: /assets/uploads/mtcx1hug-5-0-5x.jpg
+    src: /assets/uploads/mtcxd0ss-mockup-1-0-5x.jpg
     alt: ''
   - type: image
-    src: /assets/uploads/mtcx1lwc-7-0-5x.jpg
+    src: /assets/uploads/mtcxd3a8-posters.jpg
     alt: ''
   - type: image
-    src: /assets/uploads/mtcx1qkw-8-0-5x.jpg
+    src: /assets/uploads/mtcxd5c9-landing-page.jpg
     alt: ''
   - type: image
-    src: /assets/uploads/mtcx1tho-10-0-5x.jpg
-    alt: ''
-  - type: image
-    src: /assets/uploads/mtcx1vpl-9-0-5x.jpg
+    src: /assets/uploads/mtcxd8ht-mockup-3.jpg
     alt: ''
 ---
 
