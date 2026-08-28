@@ -1,6 +1,6 @@
 ---
-title: Hibbernate Wintersports
-slug: hibbernate-wintersports
+title: Hibernate Wintersports
+slug: hibernate-wintersports
 status: Live
 year: 2018
 services:
