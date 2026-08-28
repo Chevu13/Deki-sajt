@@ -266,33 +266,33 @@
     },
     "images": [
       {
-        "match": "image-9e6c0028",
-        "src": "/assets/images/opt/image-9e6c0028-1024.webp",
+        "match": "/assets/uploads/mtd3unk1-logo-design.jpg",
+        "src": "/assets/uploads/mtd3unk1-logo-design.jpg",
         "alt": "Pletho brand identity — minimalist logo design health tech startup visual identity"
       },
       {
-        "match": "image-35d99127",
-        "src": "/assets/images/opt/image-35d99127-1024.webp",
+        "match": "/assets/uploads/mtd3uufa-brand-manual.jpg",
+        "src": "/assets/uploads/mtd3uufa-brand-manual.jpg",
         "alt": "Cro Sea Villas brand identity — minimalist mug and product design mockup"
       },
       {
-        "match": "image-0c4af253",
-        "src": "/assets/images/opt/image-0c4af253-1024.webp",
+        "match": "/assets/uploads/mtd46jib-logo.jpg",
+        "src": "/assets/uploads/mtd46jib-logo.jpg",
         "alt": "Pletho brand identity — mobile app UI design health technology startup"
       },
       {
-        "match": "image-65891e6f",
-        "src": "/assets/images/opt/image-65891e6f-1024.webp",
+        "match": "/assets/uploads/mtd3vi51-artboard-1.jpg",
+        "src": "/assets/uploads/mtd3vi51-artboard-1.jpg",
         "alt": "Pletho creative direction — abstract brand visual health tech product marketing"
       },
       {
-        "match": "image-6748031f",
-        "src": "/assets/images/opt/image-6748031f-1024.webp",
+        "match": "/assets/uploads/mtd3vkgp-stationary-business-card.jpg",
+        "src": "/assets/uploads/mtd3vkgp-stationary-business-card.jpg",
         "alt": "Pletho brand identity — UI design system digital product health technology 2023"
       },
       {
-        "match": "image-102e9f47",
-        "src": "/assets/images/opt/image-102e9f47-1024.webp",
+        "match": "/assets/uploads/mtd3vmhy-stationary-letterhead.jpg",
+        "src": "/assets/uploads/mtd3vmhy-stationary-letterhead.jpg",
         "alt": "Pletho visual identity — branded merchandise and packaging health technology startup"
       }
     ],
@@ -300,42 +300,62 @@
     "sources": [
       "work/pletho/index.html"
     ],
-    "extra": [],
+    "extra": [
+      {
+        "src": "/assets/uploads/mtd3zrir-photo-logo.jpg",
+        "alt": ""
+      },
+      {
+        "src": "/assets/uploads/mtd46oy2-apple-display-free-mockup.jpg",
+        "alt": ""
+      },
+      {
+        "src": "/assets/uploads/mtd4qnta-artboard-1.jpg",
+        "alt": ""
+      },
+      {
+        "src": "/assets/uploads/mtd4qt5l-3.jpg",
+        "alt": ""
+      },
+      {
+        "src": "/assets/uploads/mtd4qxnx-2.jpg",
+        "alt": ""
+      },
+      {
+        "src": "/assets/uploads/mtd4r52b-ad-design.jpg",
+        "alt": ""
+      }
+    ],
     "texts": [
       {
         "key": "project_overview",
-        "field": "qHx5bRsBk",
         "label": "Project Overview",
-        "rows": 6,
-        "value": "The brand was created from the ground up to position Pletho as a forward-thinking, human-centered technology company. Rather than emphasizing limitation, the identity communicates empowerment, precision, and calm support through design."
+        "value": "The brand was created from the ground up to position Pletho as a forward-thinking, human-centered technology company. Rather than emphasizing limitation, the identity communicates empowerment, precision, and calm support through design.",
+        "rows": 6
       },
       {
         "key": "service1",
-        "field": "ES3pqjhrn",
         "label": "Service 1",
-        "rows": 1,
-        "value": "Creative Direction"
+        "value": "Creative Direction",
+        "rows": 1
       },
       {
         "key": "service2",
-        "field": "rc8P13D3Q",
         "label": "Service 2",
-        "rows": 1,
-        "value": "Product Marketing"
+        "value": "Product Marketing",
+        "rows": 1
       },
       {
         "key": "service3",
-        "field": "vdUCargUV",
         "label": "Service 3",
-        "rows": 1,
-        "value": "Brand Identity"
+        "value": "Brand Identity",
+        "rows": 1
       },
       {
         "key": "live_link",
-        "field": "E3vtRy1Vd",
         "label": "Live Link",
-        "rows": 1,
-        "value": "https://www.pletho.life/"
+        "value": "https://www.pletho.life/",
+        "rows": 1
       }
     ]
   },
