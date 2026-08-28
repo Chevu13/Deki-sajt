@@ -1,5 +1,5 @@
 ---
-title: 'Hibbernate '
+title: Hibbernate Winterbrand
 slug: hibbernate
 status: Live
 year: 2018
