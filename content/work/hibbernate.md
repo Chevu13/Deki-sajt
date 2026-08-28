@@ -13,10 +13,10 @@ hero_image: /assets/uploads/mtcuqyq6-mockup-2.jpg
 hero_focus: center
 gallery:
   - type: image
-    src: /assets/uploads/mtcupjxh-logo.jpg
+    src: /assets/uploads/mtcv3yc6-artboard-1.jpg
     alt: ''
   - type: image
-    src: /assets/uploads/mtcupr3k-colors.jpg
+    src: /assets/uploads/mtcv40f1-colors.jpg
     alt: ''
   - type: image
     src: /assets/uploads/mtcupxtt-logo-2.jpg
