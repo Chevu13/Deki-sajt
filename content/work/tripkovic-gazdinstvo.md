@@ -13,19 +13,16 @@ hero_image: /assets/uploads/mtlkkpvj-irina-reichert-l9ys4nnsos8-unsplash.jpg
 hero_focus: center
 gallery:
   - type: image
-    src: /assets/uploads/mtlkl1zq-logo-redesign.jpg
+    src: /assets/uploads/mtlkx1cx-logo-redesign.jpg
     alt: ''
   - type: image
-    src: /assets/uploads/mtlkl4of-final-wordmark.jpg
+    src: /assets/uploads/mtlkx5v9-final-wordmark.jpg
     alt: ''
   - type: image
     src: /assets/uploads/mtlklb0s-details.jpg
     alt: ''
   - type: image
     src: /assets/uploads/mtlkldmt-before-after.jpg
-    alt: ''
-  - type: image
-    src: /assets/uploads/mtlklh09-bottle-mockup.jpg
     alt: ''
   - type: image
     src: /assets/uploads/mtlkljtr-bottle-mockup-2.jpg
