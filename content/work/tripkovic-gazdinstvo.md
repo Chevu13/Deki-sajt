@@ -1,7 +1,7 @@
 ---
 title: Tripkovic Gazdinstvo
 slug: tripkovic-gazdinstvo
-status: Live
+status: Draft
 year: 2026
 services:
   - Brand Identity
