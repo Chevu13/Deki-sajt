@@ -1,5 +1,5 @@
 ---
-title: Tripkovic Gazdinstvo
+title: Tripković Gazdinstvo
 slug: tripkovic-gazdinstvo
 status: Live
 year: 2026
