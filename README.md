@@ -431,6 +431,25 @@ ima svoj tajmer). Dva osiguraca: `<noscript>` blok u templateu i provera posle
 
 ## Navigacija na Framer stranicama
 
+### Mobilni meni ga uopste nije imao
+
+Na uskom ekranu navigacija je svedena na dugme MENU. U Framer projektu ono
+otvara overlay, ali NocodeXport tu interakciju **nije izvezao** — dugme u
+stranici nema nijedan rukovalac (provereno na React propovima: samo `className`,
+`style`, `tabIndex`). Sa naslovne, About-a, Contact-a i sest originalnih
+projekata se na telefonu nije moglo doci do Works-a.
+
+Zbunjujuce je bilo to sto na `/work` i `/work/<slug>` meni radi — te stranice
+generise `scripts/build.mjs` i na njima meni pravi `assets/cms.js`. Otud utisak
+da "nekad radi, nekad ne": zavisilo je sa koje stranice krenes.
+
+`assets/framer-nav.js` sada sam pravi overlay, istog izgleda kao onaj iz
+`cms.css`. Dugme se trazi po `data-framer-name="Menu Button"`, a ako ga nema —
+po tekstu, da prezivi novi export. Slusa se na dokumentu, ne na dugmetu, jer
+Framer posle hidracije ume da zameni cvor.
+
+
+
 `assets/framer-nav.js` gasi Framer-ov klijentski ruter (zasto — vidi komentar u
 fajlu). Uz to resava dve stvari koje su se videle kao "link ne radi iz prvog
 klika":

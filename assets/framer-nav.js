@@ -1,8 +1,9 @@
-/* Tri ispravke Framer runtime-a na exportovanim stranicama.
+/* Cetiri ispravke Framer runtime-a na exportovanim stranicama.
  *
  * 1. Klijentska navigacija — iskljucena.
  * 2. Tap na dodirnom ekranu — uvek vodi, i iz prvog puta.
- * 3. Naslov stranice — vracen na onaj iz HTML-a.
+ * 3. Mobilni meni — dobio je sadrzaj; u exportu ga nije ni bilo.
+ * 4. Naslov stranice — vracen na onaj iz HTML-a.
  *
  * Framer export nosi svoj router: klik na interni link se presretne i stranica
  * se iscrta na klijentu, iz podataka koje Framer nosi sa sobom. To je bilo u
@@ -159,6 +160,108 @@
     },
     true
   );
+
+  /* ---------------------------------------------------------- mobilni meni */
+
+  // Na uskom ekranu navigacija je svedena na dugme MENU. U Framer projektu ono
+  // otvara overlay, ali NocodeXport tu interakciju nije izvezao: dugme u
+  // stranici nema nijedan rukovalac (provereno na React propovima — samo
+  // `className`, `style`, `tabIndex`). Dakle sa naslovne, About-a i Contact-a
+  // se na telefonu uopste nije moglo doci do Works-a.
+  //
+  // Zbunjujuce je bilo to sto na /work i /work/<slug> meni RADI — te stranice
+  // generise scripts/build.mjs i na njima meni pravi assets/cms.js. Otud utisak
+  // da "nekad radi, nekad ne".
+  //
+  // Ovde se pravi isti takav overlay, istog izgleda kao onaj iz cms.css.
+
+  var LINKS = [
+    ["/", "Home"],
+    ["/work", "Works"],
+    ["/about", "About"],
+    ["/contact", "Contact"],
+  ];
+
+  var overlay = null;
+
+  function buildOverlay() {
+    if (overlay) return overlay;
+
+    overlay = document.createElement("div");
+    overlay.id = "framer-nav-menu";
+    overlay.setAttribute("role", "dialog");
+    overlay.setAttribute("aria-modal", "true");
+    overlay.style.cssText =
+      "position:fixed;inset:0;z-index:1000;display:none;flex-direction:column;" +
+      "padding:24px;background:rgb(15,15,15)";
+
+    var close = document.createElement("button");
+    close.type = "button";
+    close.textContent = "Close";
+    close.style.cssText =
+      "align-self:flex-end;background:none;border:0;color:#fff;cursor:pointer;" +
+      "font-family:'PT Mono',monospace;font-size:15px;text-transform:uppercase";
+    close.addEventListener("click", closeMenu);
+    overlay.appendChild(close);
+
+    var list = document.createElement("nav");
+    list.style.cssText = "margin-top:48px;display:flex;flex-direction:column;gap:24px";
+    LINKS.forEach(function (pair) {
+      var link = document.createElement("a");
+      link.href = pair[0];
+      link.textContent = pair[1];
+      link.style.cssText =
+        "color:#fff;text-decoration:none;font-size:32px;" +
+        "font-family:'Switzer','Switzer Placeholder',sans-serif";
+      list.appendChild(link);
+    });
+    overlay.appendChild(list);
+
+    document.body.appendChild(overlay);
+    return overlay;
+  }
+
+  function openMenu() {
+    buildOverlay().style.display = "flex";
+    document.documentElement.style.overflow = "hidden";
+  }
+
+  function closeMenu() {
+    if (!overlay) return;
+    overlay.style.display = "none";
+    document.documentElement.style.overflow = "";
+  }
+
+  // Dugme se trazi po Framer imenu, a ako ga nema — po tekstu, da preziv i
+  // eventualni novi export.
+  function menuButton() {
+    var named = document.querySelector('[data-framer-name="Menu Button"]');
+    if (named) return named;
+
+    return Array.prototype.filter.call(
+      document.querySelectorAll('[role="button"], button, div[tabindex]'),
+      function (node) {
+        return node.textContent.trim().toUpperCase() === "MENU";
+      }
+    )[0] || null;
+  }
+
+  // Slusa se na dokumentu, ne na samom dugmetu: Framer posle hidracije ume da
+  // zameni cvor, pa bi rukovalac otisao sa starim.
+  document.addEventListener(
+    "click",
+    function (event) {
+      var button = menuButton();
+      if (!button || !button.contains(event.target)) return;
+      event.preventDefault();
+      openMenu();
+    },
+    true
+  );
+
+  document.addEventListener("keydown", function (event) {
+    if (event.key === "Escape") closeMenu();
+  });
 
   /* --------------------------------------------------------------- naslov */
 
