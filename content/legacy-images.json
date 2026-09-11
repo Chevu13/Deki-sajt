@@ -123,7 +123,8 @@
       {
         "match": "image-41fd29d8",
         "src": "/assets/images/opt/image-41fd29d8-1024.webp",
-        "alt": "Falco Gin print design — editorial booklet spread premium spirit visual identity"
+        "alt": "Falco Gin print design — editorial booklet spread premium spirit visual identity",
+        "hidden": true
       },
       {
         "match": "image-f18bb9bc",
