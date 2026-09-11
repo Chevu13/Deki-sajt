@@ -12,8 +12,14 @@
  * Framer Motion-a; klon u toj animaciji ne ucestvuje, pa mu se skida pocetno
  * skriveno stanje i dodaje sopstveni fade preko IntersectionObserver-a.
  *
- * Spisak dodatnih slika pise CMS panel u <script id="cms-extra-media"> u samoj
- * stranici. Prazan spisak znaci da skript ne radi nista.
+ * Isti mehanizam sluzi i za sklanjanje Framer-ovih slika. Slot se ne moze
+ * isprazniti u izvoru — React bi posle hidracije vratio svoju sliku iz propova,
+ * a prazan <img src> bi ostavio rupu na stranici. Zato slika ostaje gde jeste i
+ * samo joj se slajd sakriva ovde, posle hidracije. Sakriva se preko stylesheet-a
+ * sa !important, jer Framer inline stilove prepisuje u svakom frame-u.
+ *
+ * Oba spiska pise CMS panel u <script id="cms-extra-media"> u samoj stranici.
+ * Prazni spiskovi znace da skript ne radi nista.
  */
 
 (function () {
@@ -21,6 +27,13 @@
 
   var DATA_ID = "cms-extra-media";
   var MARK = "data-cms-extra";
+  var HIDE = "data-cms-hidden";
+  var DOT = "data-cms-dot";
+  var DOT_ON = "data-cms-dot-on";
+  var DOT_FIRST = "data-cms-dot-first";
+  var DOT_LAST = "data-cms-dot-last";
+  var STYLE_ID = "cms-hidden-style";
+  var DOT_SELECTOR = 'button[aria-label^="Scroll to page"]';
 
   function readConfig() {
     var node = document.getElementById(DATA_ID);
@@ -29,7 +42,9 @@
       var data = JSON.parse(node.textContent || "{}");
       var images = Array.isArray(data.images) ? data.images.filter(function (i) { return i && i.src; }) : [];
       var known = Array.isArray(data.gallery) ? data.gallery : [];
-      return images.length ? { images: images, known: known } : null;
+      var hidden = Array.isArray(data.hidden) ? data.hidden.filter(Boolean) : [];
+      if (!images.length && !hidden.length) return null;
+      return { images: images, known: known, hidden: hidden };
     } catch (err) {
       console.error("cms-extra-media: neispravan JSON", err);
       return null;
@@ -78,6 +93,8 @@
   function buildSlide(template, image, index) {
     var node = template.cloneNode(true);
     node.setAttribute(MARK, String(index));
+    // Sablon je prvi slajd galerije; ako je bas on sakriven, klon to ne nasledjuje.
+    node.removeAttribute(HIDE);
 
     node.querySelectorAll("img").forEach(function (img) {
       img.setAttribute("src", image.src);
@@ -108,10 +125,162 @@
     var tracks = findTracks(config.known);
     if (!tracks.length) return false;
 
+    ensureStyle();
     tracks.forEach(function (found) {
+      hide(config, found);
       fill(config, found);
+      // Tek sad je traka u konacnom stanju: visak sklonjen, dodate slike unutra.
+      syncDots(found);
     });
     return true;
+  }
+
+  // Framer inline stilove prepisuje u svakom frame-u, pa se sakriva pravilom iz
+  // stylesheet-a sa !important, a ne postavljanjem style.display na slajdu.
+  function ensureStyle() {
+    if (document.getElementById(STYLE_ID)) return;
+    var style = document.createElement("style");
+    style.id = STYLE_ID;
+    style.textContent =
+      "[" + HIDE + "]{display:none !important}" +
+      // Framer i tackicama pise inline stil u svakom frame-u, pa i razmak i
+      // aktivno stanje moraju da dodju odavde.
+      "[" + DOT + "]{padding:10px 4px !important}" +
+      "[" + DOT_FIRST + "]{padding-left:10px !important}" +
+      "[" + DOT_LAST + "]{padding-right:10px !important}" +
+      "[" + DOT + "]>*{opacity:.5 !important}" +
+      "[" + DOT_ON + "]>*{opacity:1 !important}";
+    (document.head || document.documentElement).appendChild(style);
+  }
+
+  // Slajdovi koje je panel oznacio kao sklonjene. Slika ostaje u izvoru — samo
+  // njen slajd ispada iz rasporeda, pa nema ni praznog mesta ni scroll-snap
+  // tacke na mobilnoj traci.
+  function hide(config, found) {
+    if (!config.hidden.length) return;
+
+    config.hidden.forEach(function (token) {
+      var selector = 'img[src*="' + token + '"], source[srcset*="' + token + '"]';
+      Array.prototype.forEach.call(found.track.querySelectorAll(selector), function (node) {
+        var slide = node;
+        while (slide && slide.parentElement !== found.track) slide = slide.parentElement;
+        // Dodate slike nikad ne ucestvuju: njihov src je nov, a sablon im je
+        // ocisten u buildSlide.
+        if (!slide || slide.hasAttribute(MARK)) return;
+        if (!slide.hasAttribute(HIDE)) slide.setAttribute(HIDE, "");
+      });
+    });
+  }
+
+  // Framer iscrtava tacno sest tackica — koliko komponenta ima polja za sliku,
+  // a ne koliko slajdova stvarno stoji u traci. Na Pletho-u je vec bilo sest
+  // tackica na dvanaest slajdova, a cim se slajd skloni, Framer na kraju trake
+  // upali tackicu koje vise nema na ekranu.
+  //
+  // Zato se tackice preuzimaju: jedna po slajdu, aktivna se racuna iz
+  // scrollLeft-a, a klik vodi na tacan slajd. Ista logika vec stoji u
+  // assets/cms.js za nove project stranice, pa se obe galerije ponasaju isto.
+  function slidesOf(track) {
+    return Array.prototype.filter.call(track.children, function (node) {
+      return !node.hasAttribute(HIDE);
+    });
+  }
+
+  function markActive(pill, track) {
+    var slides = slidesOf(track);
+    var dots = pill.querySelectorAll("[" + DOT + "]:not([" + HIDE + "])");
+    if (!dots.length) return;
+
+    var best = 0;
+    var nearest = Infinity;
+    slides.forEach(function (slide, index) {
+      var distance = Math.abs(slide.offsetLeft - track.scrollLeft);
+      if (distance < nearest) {
+        nearest = distance;
+        best = index;
+      }
+    });
+
+    Array.prototype.forEach.call(dots, function (dot, index) {
+      if (index === best) dot.setAttribute(DOT_ON, "");
+      else dot.removeAttribute(DOT_ON);
+    });
+  }
+
+  function syncDots(found) {
+    var track = found.track;
+    var scope = track.parentElement;
+    while (scope && scope !== document.body && !scope.querySelector(DOT_SELECTOR)) {
+      scope = scope.parentElement;
+    }
+    if (!scope || scope === document.body) return;
+
+    var first = scope.querySelector(DOT_SELECTOR);
+    if (!first) return;
+    var pill = first.parentElement;
+    var slides = slidesOf(track);
+    if (!slides.length) return;
+
+    // Framer-ovih dugmadi ima sest; visak se sakriva, a kad slajdova ima vise
+    // (dodate slike) dogradjuju se klonovi. Klon ne nosi React-ov interni kljuc,
+    // pa Framer-ov delegirani rukovalac na njemu nista ne radi — klik hvatamo mi.
+    var buttons = Array.prototype.slice.call(pill.children);
+    while (buttons.length < slides.length) {
+      var clone = buttons[0].cloneNode(true);
+      pill.appendChild(clone);
+      buttons.push(clone);
+    }
+
+    buttons.forEach(function (button, index) {
+      button.setAttribute(DOT, "");
+      button.setAttribute("aria-label", "Slika " + (index + 1));
+      if (index >= slides.length) {
+        button.setAttribute(HIDE, "");
+        button.removeAttribute(DOT_FIRST);
+        button.removeAttribute(DOT_LAST);
+        return;
+      }
+      button.removeAttribute(HIDE);
+      if (index === 0) button.setAttribute(DOT_FIRST, "");
+      else button.removeAttribute(DOT_FIRST);
+      if (index === slides.length - 1) button.setAttribute(DOT_LAST, "");
+      else button.removeAttribute(DOT_LAST);
+    });
+
+    if (!pill.hasAttribute("data-cms-dots-bound")) {
+      pill.setAttribute("data-cms-dots-bound", "");
+
+      // Capture faza i stopImmediatePropagation: Framer svoj klik racuna
+      // proporcionalno po sirini trake, sto posle sklanjanja vodi na pogresan slajd.
+      pill.addEventListener(
+        "click",
+        function (event) {
+          var button = event.target.closest ? event.target.closest("[" + DOT + "]") : null;
+          if (!button || button.hasAttribute(HIDE)) return;
+          event.preventDefault();
+          event.stopImmediatePropagation();
+
+          var visible = Array.prototype.filter.call(pill.children, function (node) {
+            return !node.hasAttribute(HIDE);
+          });
+          var slide = slidesOf(track)[visible.indexOf(button)];
+          if (slide) track.scrollTo({ left: slide.offsetLeft, behavior: "smooth" });
+        },
+        true
+      );
+
+      var pending = false;
+      track.addEventListener("scroll", function () {
+        if (pending) return;
+        pending = true;
+        requestAnimationFrame(function () {
+          pending = false;
+          markActive(pill, track);
+        });
+      });
+    }
+
+    markActive(pill, track);
   }
 
   function fill(config, found) {

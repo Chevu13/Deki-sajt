@@ -19,7 +19,7 @@ assets/images, fonts, videos   Mediji (Framer export)
 assets/animate                 Framer/Motion runtime (samo za Framer stranice)
 assets/uploads                 Slike/video koje CMS panel upload-uje
 assets/cms.css, cms.js         Stilovi/JS za CMS-generisane stranice (bez Framer JS-a)
-assets/legacy-gallery.js       Dodaje slike preko Framer-ovih sest u 6 originalnih stranica
+assets/legacy-gallery.js       Dodaje, sklanja i prebrojava slike u galerijama 6 originalnih stranica
 assets/framer-nav.js           Gasi Framer klijentsku navigaciju i cuva <title> posle hidracije
 assets/framer-media.js         Slike na naslovnoj i About-u — da ih Framer ne secka
 
@@ -76,7 +76,7 @@ Panel ima dve kolekcije u sidebaru:
 | Kolekcija | Stavke | Izvor | Šta se menja |
 |---|---|---|---|
 | **Work Items** | CMS projekti | `content/work/*.md` | sve; `scripts/build.mjs` iz njih generiše `work/<slug>/index.html` |
-| **Work Items** | Framer projekti (originalnih 6) | `content/legacy-work.json` + sam HTML | kartica na `/work`, **Project Overview, Service 1–3, Live Link**, sve slike i video **+ dodatne preko šest**, Status, brisanje |
+| **Work Items** | Framer projekti (originalnih 6) | `content/legacy-work.json` + sam HTML | kartica na `/work`, **Project Overview, Service 1–3, Live Link**, sve slike i video **+ dodatne preko šest, sklanjanje/vraćanje Framer slotova**, Status, brisanje |
 | **Pages** | Home, About | `content/pages.json` + sam HTML | Home: hero slika i tekst ispod hero banera. About: tri slike u sekciji |
 
 ### Kako se menja sadržaj statičkih Framer stranica
@@ -145,6 +145,47 @@ Jedina razlika u odnosu na originalne slajdove: Framer svoje otkriva scroll
 animacijom sticky sekcije, na koju se spolja ne može zakačiti, pa se dodate
 prikazuju kratkim fade-om umesto scroll-sinhronizovanim. Sve ostalo — položaj,
 dimenzije, razmak, lazy loading, dužina scroll-a — isto je.
+
+### Sklanjanje slika iz galerija originalnih 6
+
+Isto ogranicenje vazi i obrnuto: Framer-ov slot se **ne moze isprazniti**. Ako
+mu se obrise `src`, u stranici ostaje `<img>` bez adrese; ako se ukloni ceo
+element, React ga posle hidracije vrati iz svojih propova. Panel je zato jedno
+vreme odbijao praznjenje — a dugme × je i dalje stajalo, pa je Dejan mogao da
+obrise sliku i onda ne moze da sacuva.
+
+Resenje koristi isti mehanizam kao dodatne slike. Slika **ostaje u izvoru**, a
+`legacy-gallery.js` joj posle hidracije sakriva slajd. Sakriva se pravilom iz
+stylesheet-a sa `!important`, ne postavljanjem `style.display` — Framer inline
+stilove prepisuje u svakom frame-u.
+
+U panelu: × sklanja sliku, dugme **Vrati** je vraca. Stanje se pamti na dva
+mesta — `hidden: true` u `content/legacy-images.json` i spisak haseva u
+`<script id="cms-extra-media">` na stranici. `src` i `match` ostaju netaknuti,
+pa slika moze i da se vrati jednim klikom i da se kasnije zameni drugom.
+
+`npm run media-map` prepisuje i manifest i taj blok, pa oba cuva pri
+regenerisanju — inace bi svako pokretanje vratilo sklonjene slike na stranicu.
+
+Naslovna slika (Thumb) nema × uopste: ona je i kartica na `/work` i banner na
+vrhu stranice projekta, pa moze samo da se zameni.
+
+#### Tackice ispod galerije
+
+Framer iscrtava **tacno sest** tackica — koliko komponenta ima polja za sliku, a
+ne koliko slajdova stvarno stoji u traci. Pletho je tako vec imao sest tackica na
+dvanaest slajdova, a cim se slajd skloni, Framer na kraju trake upali tackicu
+koje vise nema na ekranu.
+
+Zato `legacy-gallery.js` tackice **preuzima** kad se broj slajdova razlikuje od
+broja dugmadi: dogradi klonove ili sakrije visak, aktivnu racuna iz `scrollLeft`-a,
+a klik hvata u capture fazi i vodi na tacan slajd (Framer svoj klik racuna
+proporcionalno po sirini trake, sto posle sklanjanja promasi). Klon ne nosi
+React-ov interni kljuc, pa Framer-ov delegirani rukovalac na njemu nista ne radi.
+
+Logika je ista kao u [assets/cms.js](assets/cms.js) za nove project stranice, pa
+se obe galerije ponasaju isto. Na desktopu Framer tackice ne iscrtava, i tu se
+nista ne menja.
 
 ### Zasto je Framer-ova klijentska navigacija ugasena
 

@@ -159,10 +159,10 @@ function ensureNavScript(file) {
   return true;
 }
 
-function extraBlock(known, images) {
+function extraBlock(known, images, hidden) {
   return (
     '<script type="application/json" id="' + EXTRA_BLOCK_ID + '">' +
-    JSON.stringify({ gallery: known, images: images || [] }) +
+    JSON.stringify({ gallery: known, images: images || [], hidden: hidden || [] }) +
     "</script>"
   );
 }
@@ -172,20 +172,25 @@ function ensureExtraHooks(file, known) {
   let html = fs.readFileSync(full, "utf8");
   const before = html;
 
-  // Sacuvaj vec upisane dodatne slike ako blok postoji.
+  // Sacuvaj vec upisane dodatne i sklonjene slike ako blok postoji. Bez ovoga
+  // bi svako pokretanje media-map-a vratilo na stranicu slike koje je panel
+  // sklonio.
   let existing = [];
+  let hidden = [];
   const found = new RegExp(
     '<script type="application/json" id="' + EXTRA_BLOCK_ID + '">([\\s\\S]*?)</script>'
   ).exec(html);
   if (found) {
     try {
-      existing = JSON.parse(found[1]).images || [];
+      const data = JSON.parse(found[1]);
+      existing = data.images || [];
+      hidden = data.hidden || [];
     } catch (err) {
       console.warn(`  upozorenje: neispravan ${EXTRA_BLOCK_ID} u ${file}`);
     }
-    html = html.replace(found[0], extraBlock(known, existing));
+    html = html.replace(found[0], extraBlock(known, existing, hidden));
   } else {
-    html = html.replace("</body>", extraBlock(known, existing) + "\n</body>");
+    html = html.replace("</body>", extraBlock(known, existing, hidden) + "\n</body>");
   }
 
   if (!html.includes("/assets/legacy-gallery.js")) {
@@ -196,7 +201,7 @@ function ensureExtraHooks(file, known) {
   }
 
   if (html !== before) fs.writeFileSync(full, html, "utf8");
-  return existing;
+  return { extra: existing, hidden: hidden };
 }
 
 // Tekstualna polja stranice projekta stoje u Framer CMS kolekciji, a njihove
@@ -282,8 +287,17 @@ function buildLegacy() {
     };
 
     const known = gallery.slice(0, GALLERY_SLOTS).map((slot) => slot.match);
-    const extras = ensureExtraHooks(`work/${project.slug}/index.html`, known);
+    const hooks = ensureExtraHooks(`work/${project.slug}/index.html`, known);
+    const extras = hooks.extra;
     manifest[project.slug].extra = extras;
+
+    // Sklonjeni slotovi se prepoznaju po hasu iz bloka na stranici; slika je i
+    // dalje u izvoru, pa je orderedImages i dalje nalazi.
+    if (hooks.hidden.length) {
+      manifest[project.slug].images.forEach((slot) => {
+        if (hooks.hidden.includes(slot.match)) slot.hidden = true;
+      });
+    }
 
     const fields = textFields(html);
     manifest[project.slug].texts = fields;
@@ -295,6 +309,7 @@ function buildLegacy() {
       `${project.slug}: thumb + ${Math.min(gallery.length, GALLERY_SLOTS)} slika` +
         (video ? " + video" : "") +
         (extras.length ? ` + ${extras.length} dodatnih` : "") +
+        (hooks.hidden.length ? ` (${hooks.hidden.length} sklonjeno)` : "") +
         `, ${manifest[project.slug].sources.length} izvor(a)`
     );
   }

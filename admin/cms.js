@@ -440,9 +440,11 @@
   function fromLegacy(row, manifest) {
     var slots = manifest && manifest.images ? manifest.images.slice(0, LEGACY_IMAGE_SLOTS) : [];
     var images = slots.map(function (slot) {
-      return { src: slot.src, alt: slot.alt || "", match: slot.match };
+      // `hidden` znaci: slika ostaje u Framer stranici (ne moze da se izbaci iz
+      // izvora), ali joj assets/legacy-gallery.js sklanja slajd posle hidracije.
+      return { src: slot.src, alt: slot.alt || "", match: slot.match, hidden: !!slot.hidden };
     });
-    while (images.length < LEGACY_IMAGE_SLOTS) images.push({ src: "", alt: "", match: "" });
+    while (images.length < LEGACY_IMAGE_SLOTS) images.push({ src: "", alt: "", match: "", hidden: false });
 
     var thumb = (manifest && manifest.thumb) || { src: row.hero_image || "", match: "" };
 
@@ -1587,7 +1589,10 @@
     fields.push(
       fieldRow(
         "Thumb",
-        mediaSlot(draft.thumb, "image"),
+        // Bez ×: naslovna slika je i kartica na /work i banner na vrhu stranice,
+        // pa ne moze da ostane prazna — moze samo da se zameni. Ranije je × stajao
+        // i publish bi pukao tek na kraju.
+        mediaSlot(draft.thumb, "image", false),
         isLegacy
           ? "Naslovna slika — kartica na /work i velika slika na vrhu stranice projekta."
           : "Naslovna slika — kartica na /work i vrh stranice projekta."
@@ -1634,16 +1639,30 @@
           mediaSlot(
             image,
             "image",
-            // Kod CMS projekata × sklanja ceo slot, jer je galerija niz. Kod
-            // originalnih 6 slotova ima tacno sest i × samo prazni sliku.
+            // Kod CMS projekata × sklanja ceo slot, jer je galerija niz. Framer-ovih
+            // slotova ima tacno sest i ne mogu da nestanu iz izvora, pa × slajd
+            // sakriva: slika ostaje u stranici, a sa ekrana je skida
+            // assets/legacy-gallery.js posle hidracije.
             isLegacy
-              ? null
+              ? function () {
+                  if (!image.src) return;
+                  image.hidden = true;
+                  markDirty();
+                  rerenderEditor();
+                }
               : function () {
                   draft.images.splice(index, 1);
                   if (!draft.images.length) draft.images.push({ src: "", alt: "", match: "" });
                   markDirty();
                   rerenderEditor();
+                },
+            isLegacy
+              ? function () {
+                  image.hidden = false;
+                  markDirty();
+                  rerenderEditor();
                 }
+              : null
           )
         )
       );
@@ -1698,9 +1717,9 @@
             text:
               "Ovo je originalna Framer stranica. Slike i tekst kartice se menjaju " +
               "odavde; raspored i animacije same stranice dolaze iz Framer export-a. " +
-              "Broj slika je fiksan na sest jer Framer komponenta te stranice ima " +
-              "tacno toliko polja — sedma se dodaje samo u Frameru, pa novim exportom. " +
-              "Novi projekti nemaju to ogranicenje.",
+              "Prvih sest slika su Framer-ova polja i ona ostaju u izvoru: × ih sklanja " +
+              "sa stranice, a dugme Vrati ih vraca. Sedmu i dalje ubacuje sajt sam, " +
+              "pri ucitavanju stranice. Novi projekti nemaju to ogranicenje.",
           })
         )
       );
@@ -1766,11 +1785,15 @@
   }
 
   // slot je { src, alt, match } — menja se u mestu da bi draft ostao jedan
-  // objekat. Ako je dat onRemove, × sklanja ceo slot; inace samo prazni sliku.
-  function mediaSlot(slot, kind, onRemove) {
+  // objekat. onRemove: funkcija — × sklanja ceo slot; izostavljen — × prazni
+  // sliku; false — nema × (slot koji ne sme da ostane prazan).
+  // onRestore stoji samo uz Framer slotove, gde × sliku sakriva a ne brise.
+  function mediaSlot(slot, kind, onRemove, onRestore) {
     var accept = kind === "video" ? "video/mp4,video/webm" : "image/*";
 
-    if (!slot.src) {
+    // Sklonjen Framer slot izgleda kao prazan iako `src` ostaje: slika je jos u
+    // stranici, samo joj je slajd sakriven. Zato i dugme "Vrati".
+    if (!slot.src || slot.hidden) {
       return el("div", { class: "media" }, [
         el(
           "button",
@@ -1784,7 +1807,11 @@
           },
           [kind === "video" ? "Choose File..." : "Upload"]
         ),
-        onRemove
+        slot.hidden && onRestore
+          ? el("button", { class: "slot-remove", title: "Vrati originalnu sliku", onclick: onRestore }, [
+              "Vrati",
+            ])
+          : onRemove && !onRestore
           ? el("button", { class: "slot-remove", title: "Ukloni ovaj slot", onclick: onRemove }, [
               "Ukloni",
             ])
@@ -1798,21 +1825,23 @@
         isVideoPath(slot.src) || kind === "video"
           ? el("video", { src: preview, muted: true, playsinline: true })
           : el("img", { src: preview, alt: slot.alt || "" }),
-        el(
-          "button",
-          {
-            class: "thumb__remove",
-            title: onRemove ? "Ukloni sliku iz galerije" : "Ukloni sliku",
-            onclick:
-              onRemove ||
-              function () {
-                slot.src = "";
-                markDirty();
-                rerenderEditor();
+        onRemove === false
+          ? null
+          : el(
+              "button",
+              {
+                class: "thumb__remove",
+                title: onRemove ? "Ukloni sliku iz galerije" : "Ukloni sliku",
+                onclick:
+                  onRemove ||
+                  function () {
+                    slot.src = "";
+                    markDirty();
+                    rerenderEditor();
+                  },
               },
-          },
-          ["×"]
-        ),
+              ["×"]
+            ),
       ]),
       el(
         "button",
@@ -1858,6 +1887,7 @@
         repoPath: CFG.mediaFolder + "/" + path.split("/").pop(),
       };
       slot.src = path;
+      slot.hidden = false;
       markDirty();
       rerenderEditor();
     };
@@ -1905,12 +1935,13 @@
   }
 
   // Framer slot ne moze da ostane prazan: u stranici bi ostao <img> bez adrese.
-  // Slika se menja, ne brise — za dodatne slike postoji poseban spisak.
+  // Slika se zato ili zamenjuje, ili sklanja preko × (`hidden`) — a tad joj src
+  // ostaje. Prazan src ovde znaci da je manifest u losem stanju.
   function requireSrc(src, label) {
     if (src) return;
     throw new Error(
       label.charAt(0).toUpperCase() + label.slice(1) + " ne moze da ostane prazna. " +
-        "Zameni je drugom slikom; prazan slot postoji samo kod dodatnih slika."
+        "Zameni je drugom slikom, ili je skloni sa stranice preko ×."
     );
   }
 
@@ -1964,11 +1995,13 @@
     return html;
   }
 
-  // Spisak dodatnih slika koji cita assets/legacy-gallery.js. `gallery` su
-  // hasevi Framer-ovih sest slika — po njima skript pronalazi galeriju u DOM-u
-  // posle hidracije, bez oslanjanja na Framer klase koje se menjaju exportom.
-  function writeExtraBlock(html, known, images) {
-    var json = JSON.stringify({ gallery: known, images: images });
+  // Spisak dodatnih i sklonjenih slika koji cita assets/legacy-gallery.js.
+  // `gallery` su hasevi Framer-ovih sest slika — po njima skript pronalazi
+  // galeriju u DOM-u posle hidracije, bez oslanjanja na Framer klase koje se
+  // menjaju exportom. `hidden` su hasevi slajdova koje treba skloniti; ostaju i
+  // u `gallery`, jer slika ostaje u stranici i sluzi kao orijentir.
+  function writeExtraBlock(html, known, images, hidden) {
+    var json = JSON.stringify({ gallery: known, images: images, hidden: hidden || [] });
     var re = /(<script type="application\/json" id="cms-extra-media">)([\s\S]*?)(<\/script>)/;
 
     if (re.test(html)) {
@@ -1993,11 +2026,15 @@
 
     entry.images = draft.images.map(function (image, index) {
       var before = state.original.images[index] || {};
-      return {
+      var slot = {
         match: image.src === before.src ? before.match || image.src : image.src,
         src: image.src,
         alt: image.alt || "",
       };
+      // Sklonjena slika zadrzava src i match: tako moze da se vrati jednim
+      // klikom, a i dalje je adresabilna ako se kasnije zamenjuje.
+      if (image.hidden) slot.hidden = true;
+      return slot;
     });
 
     entry.video = draft.video.src
@@ -2026,6 +2063,32 @@
         return image.src === before.src ? before.match || image.src : image.src;
       })
       .filter(Boolean);
+  }
+
+  // Hasevi slajdova koje assets/legacy-gallery.js treba da skloni. Racuna se
+  // isto kao galleryMatches, jer sklonjena slika ostaje u stranici i po istom
+  // hasu se pronalazi u DOM-u.
+  function hiddenMatches(draft) {
+    return draft.images
+      .map(function (image, index) {
+        if (!image.hidden || !image.src) return "";
+        var before = state.original.images[index] || {};
+        return image.src === before.src ? before.match || image.src : image.src;
+      })
+      .filter(Boolean);
+  }
+
+  function hiddenChanged(draft) {
+    return (
+      JSON.stringify(hiddenMatches(draft)) !==
+      JSON.stringify(
+        (state.original.images || [])
+          .map(function (image) {
+            return image.hidden && image.src ? image.match || image.src : "";
+          })
+          .filter(Boolean)
+      )
+    );
   }
 
   function cleanExtras(draft) {
@@ -2434,6 +2497,7 @@
 
     var pairs = changedSlots(draft, state.original);
     var extrasDirty = extrasChanged(draft);
+    var hiddenDirty = hiddenChanged(draft);
 
     var textUpdates = [];
     (draft.texts || []).forEach(function (text, index) {
@@ -2443,7 +2507,7 @@
       }
     });
 
-    if (!pairs.length && !extrasDirty && !textUpdates.length) {
+    if (!pairs.length && !extrasDirty && !hiddenDirty && !textUpdates.length) {
       return Promise.resolve({ message: "CMS: izmena kartice " + draft.title, files: files });
     }
 
@@ -2473,7 +2537,7 @@
 
         // Spisak dodatnih slika stoji samo u stranici samog projekta.
         if (sources[index] === pageFile) {
-          next = writeExtraBlock(next, galleryMatches(draft), cleanExtras(draft));
+          next = writeExtraBlock(next, galleryMatches(draft), cleanExtras(draft), hiddenMatches(draft));
         }
         if (next !== content) {
           files.push({ path: sources[index], base64: b64encode(next) });
