@@ -1892,17 +1892,43 @@
     return files;
   }
 
+  // Slot se u stranici pronalazi po `match`. Ako ga nema, izmena nema gde da se
+  // upise — a ranije se takav slot tiho preskakao i publish je i dalje javljao
+  // uspeh: Dejan je na Falco Gin-u "obrisao" dve slike, panel je rekao da je
+  // sacuvao, a slike su ostale na stranici. Zato se sad staje sa jasnom porukom.
+  function requireMatch(before, label) {
+    if (before && before.match) return;
+    throw new Error(
+      "Mapa slika za ovaj projekat je zastarela, pa " + label + " nema gde da se " +
+        "upise. Pokreni `npm run media-map` pa osvezi panel."
+    );
+  }
+
+  // Framer slot ne moze da ostane prazan: u stranici bi ostao <img> bez adrese.
+  // Slika se menja, ne brise — za dodatne slike postoji poseban spisak.
+  function requireSrc(src, label) {
+    if (src) return;
+    throw new Error(
+      label.charAt(0).toUpperCase() + label.slice(1) + " ne moze da ostane prazna. " +
+        "Zameni je drugom slikom; prazan slot postoji samo kod dodatnih slika."
+    );
+  }
+
   // Vraca listu { match, src } za slotove kojima se slika promenila.
   function changedSlots(draft, original) {
     var pairs = [];
-    if (draft.thumb.src !== original.thumb.src && original.thumb.match) {
+    if (draft.thumb.src !== original.thumb.src) {
+      requireSrc(draft.thumb.src, "naslovna slika");
+      requireMatch(original.thumb, "naslovna slika");
       pairs.push({ match: original.thumb.match, src: draft.thumb.src });
     }
     draft.images.forEach(function (image, index) {
       var before = original.images[index];
-      if (before && before.match && image.src !== before.src) {
-        pairs.push({ match: before.match, src: image.src });
-      }
+      if (!before || image.src === before.src) return;
+      var label = "slika " + (index + 1);
+      requireSrc(image.src, label);
+      requireMatch(before, label);
+      pairs.push({ match: before.match, src: image.src });
     });
     if (draft.video.src !== original.video.src && original.video.match) {
       pairs.push({ match: original.video.match, src: draft.video.src });
@@ -2105,7 +2131,13 @@
     state.saving = true;
     render();
 
-    buildCommit(draft)
+    // buildCommit ume i sinhrono da baci (npr. kad slot nema `match`), pa se
+    // poziv uvija — inace greska promakne mimo .catch i panel ostane zaglavljen
+    // na "cuvam".
+    Promise.resolve()
+      .then(function () {
+        return buildCommit(draft);
+      })
       .then(function (payload) {
         return state.store.commit(payload.message, payload.files);
       })
@@ -2280,9 +2312,11 @@
     var imagePairs = [];
     draft.images.forEach(function (image, index) {
       var before = state.original.images[index];
-      if (before && image.src !== before.src) {
-        imagePairs.push({ match: before.match, src: image.src });
-      }
+      if (!before || image.src === before.src) return;
+      var label = "slika " + (index + 1);
+      requireSrc(image.src, label);
+      requireMatch(before, label);
+      imagePairs.push({ match: before.match, src: image.src });
     });
 
     var textPairs = [];
