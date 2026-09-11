@@ -96,8 +96,8 @@
     },
     "images": [
       {
-        "match": "image-fd856a57",
-        "src": "/assets/images/opt/image-fd856a57-1024.webp",
+        "match": "/assets/uploads/mtx19odo-3.jpg",
+        "src": "/assets/uploads/mtx19odo-3.jpg",
         "alt": "Falco Gin editorial design — premium print booklet character illustration art direction"
       },
       {
@@ -111,18 +111,18 @@
         "alt": "Falco Gin editorial design — multi-page print booklet art direction premium gin branding"
       },
       {
-        "match": "image-58f0677d",
-        "src": "/assets/images/opt/image-58f0677d-1024.webp",
+        "match": "/assets/uploads/mtx2xwhx-42.jpg",
+        "src": "/assets/uploads/mtx2xwhx-42.jpg",
         "alt": "Falco Gin art direction — atmospheric brand photography Swiss handcrafted gin identity"
       },
       {
-        "match": "image-41fd29d8",
-        "src": "/assets/images/opt/image-41fd29d8-1024.webp",
+        "match": "",
+        "src": "",
         "alt": "Falco Gin print design — editorial booklet spread premium spirit visual identity"
       },
       {
-        "match": "image-f18bb9bc",
-        "src": "/assets/images/opt/image-f18bb9bc-1024.webp",
+        "match": "",
+        "src": "",
         "alt": "Falco Gin brand identity — editorial print design luxury gin booklet art direction"
       }
     ],
