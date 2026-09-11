@@ -22,7 +22,7 @@ gallery:
     src: /assets/uploads/mtng8z7a-mockup-7.jpg
     alt: ''
   - type: image
-    src: /assets/uploads/mtlkljtr-bottle-mockup-2.jpg
+    src: /assets/uploads/mtwtzxpx-mockup-6.jpg
     alt: ''
   - type: image
     src: /assets/uploads/mtng9z3f-mockup-4.jpg
