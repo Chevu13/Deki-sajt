@@ -2147,6 +2147,15 @@
   // Framer slot ne moze da ostane prazan: u stranici bi ostao <img> bez adrese.
   // Slika se zato ili zamenjuje, ili sklanja preko × (`hidden`) — a tad joj src
   // ostaje. Prazan src ovde znaci da je manifest u losem stanju.
+  // Bez `field` se tekst ne moze naci u Framer payload-u: izmena bi prosla bez
+  // greske, a posetilac bi i dalje video stari tekst. Zato se staje.
+  function requireField(field, label) {
+    if (field) return;
+    throw new Error(
+      "Mapa teksta za " + label + " je zastarela, pa izmena nema gde da se upise. " +
+        "Pokreni `npm run media-map` pa osvezi panel."
+    );
+  }
   function requireSrc(src, label) {
     if (src) return;
     throw new Error(
@@ -2253,8 +2262,17 @@
       : null;
 
     entry.extra = cleanExtras(draft);
+    // `field` mora da ostane: po njemu updatePayload pronalazi tekst u Framer
+    // payload-u. Bez njega izmena teksta prodje bez greske, a posetilac i dalje
+    // vidi stari — sto se i desilo Falco Gin-u posle prvog snimanja iz panela.
     entry.texts = (draft.texts || []).map(function (text) {
-      return { key: text.key, label: text.label, value: text.value, rows: text.rows };
+      return {
+        key: text.key,
+        field: text.field,
+        label: text.label,
+        value: text.value,
+        rows: text.rows,
+      };
     });
 
     manifest[draft.slug] = entry;
@@ -2739,6 +2757,7 @@
     (draft.texts || []).forEach(function (text, index) {
       var before = (state.original.texts || [])[index];
       if (before && text.value !== before.value) {
+        requireField(text.field, text.label || "tekst " + (index + 1));
         textUpdates.push({ field: text.field, from: before.value, to: text.value });
       }
     });

@@ -450,6 +450,17 @@ cela lista — cela lista je `/work`. Novi projekti se zato na naslovnoj ne
 pojavljuju sami; ako neki treba da **udje medju izabrane**, menja se sama
 `index.html`. Njihov **redosled** se menja iz panela — vidi ispod.
 
+### Tekst na Framer stranicama: `field` mora da prezivi snimanje
+
+Duzi case-study tekst stoji u Framer payload-u, a `updatePayload` ga pronalazi
+po `field` hasu iz `content/legacy-images.json`. Panel je taj kljuc brisao pri
+svakom snimanju: prvo snimanje projekta je proslo, a svako sledece menjanje
+teksta bi proslo **bez greske, a posetilac bi i dalje video stari tekst** — jer
+bi se payload preskocio. Falco Gin je tako i ostao bez `field`-a.
+
+Sad se `field` cuva, a ako ga nema, snimanje staje s porukom da se pokrene
+`npm run media-map`. Home i About ovo ne dodiruje: tamo je zamena teksta
+doslovna, bez trazenja po payload-u.
 ## Redosled projekata
 
 Panel → **Redosled**. Dve liste: `/work` (svi projekti) i naslovna (one cetiri
