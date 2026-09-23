@@ -22,6 +22,9 @@ const ROOT = path.resolve(import.meta.dirname, "..");
 const CONTENT_DIR = path.join(ROOT, "content/work");
 const LEGACY_FILE = path.join(ROOT, "content/legacy-work.json");
 const WORK_LIST_FILE = path.join(ROOT, "work/index.html");
+const ORDER_FILE = path.join(ROOT, "content/order.json");
+const HOME_FILE = path.join(ROOT, "index.html");
+const HOME_ORDER_ID = "cms-home-order";
 const SITEMAP_FILE = path.join(ROOT, "sitemap.xml");
 const SITE_URL = "https://www.dtumenko.com";
 // Strelica u uglu kartice — isti fajl koji Framer koristi na naslovnoj.
@@ -388,10 +391,91 @@ function pruneOrphans(slugs) {
   return removed;
 }
 
+// Redosled projekata na /work i na naslovnoj. `content/order.json` je samo
+// nagovestaj redosleda, ne spisak sta postoji: sta u njemu nije nabrojano ide na
+// kraj, zadrzavajuci medjusobni raspored. Tako novi projekat radi i pre nego sto
+// ga neko pomeri u panelu, a preimenovan slug ne moze da izbaci projekat sa liste.
+function readOrder() {
+  const raw = readIfExists(ORDER_FILE);
+  if (!raw) return { work: [], home: [] };
+  try {
+    const data = JSON.parse(raw);
+    return {
+      work: Array.isArray(data.work) ? data.work : [],
+      home: Array.isArray(data.home) ? data.home : [],
+    };
+  } catch (err) {
+    console.warn("upozorenje: content/order.json nije ispravan JSON — redosled se preskace");
+    return { work: [], home: [] };
+  }
+}
+
+function applyOrder(projects, order) {
+  const rank = new Map(order.map((slug, index) => [slug, index]));
+  return projects
+    .map((project, index) => ({ project, index }))
+    .sort((a, b) => {
+      const ra = rank.has(a.project.slug) ? rank.get(a.project.slug) : Infinity;
+      const rb = rank.has(b.project.slug) ? rank.get(b.project.slug) : Infinity;
+      // Isti rang (oba nenabrojana) znaci "ostavi kako je bilo" — zato zatecen indeks.
+      return ra === rb ? a.index - b.index : ra - rb;
+    })
+    .map((entry) => entry.project);
+}
+
+// Naslovna je Framer export i njene cetiri kartice se ne generisu odavde. Ali
+// one su flex-stavke, pa im se redosled menja CSS-om `order` — bez diranja
+// markupa, pa Framer i dalje racuna svoje scroll animacije nad istim cvorovima.
+//
+// Pravilo cilja karticu preko `href` linka u njoj, jer Framer klase se menjaju
+// sa svakim exportom. Isti selektor pokriva i Desktop i Mobile varijantu.
+function homeSlugs(html) {
+  const seen = [];
+  const re = /href="\.\/work\/([a-z0-9-]+)"/g;
+  let match;
+  while ((match = re.exec(html))) {
+    if (!seen.includes(match[1])) seen.push(match[1]);
+  }
+  return seen;
+}
+
+function homeOrderStyle(slugs) {
+  if (slugs.length < 2) return "";
+  const rules = slugs
+    .map((slug, index) => `div:has(> a[href="./work/${slug}"]){order:${index} !important}`)
+    .join("");
+  return `<style id="${HOME_ORDER_ID}">${rules}</style>`;
+}
+
+function writeHomeOrder(order) {
+  const html = readIfExists(HOME_FILE);
+  if (!html) return null;
+
+  const present = homeSlugs(html);
+  if (present.length < 2) return null;
+
+  // order.home je nagovestaj; merodavno je sta stvarno stoji na stranici.
+  const ranked = applyOrder(
+    present.map((slug) => ({ slug })),
+    order.home
+  ).map((entry) => entry.slug);
+
+  const style = homeOrderStyle(ranked);
+  const re = new RegExp(`<style id="${HOME_ORDER_ID}">[\\s\\S]*?</style>`);
+  const next = re.test(html)
+    ? html.replace(re, style)
+    : html.replace("</head>", style + "\n</head>");
+
+  if (next === html) return ranked;
+  fs.writeFileSync(HOME_FILE, next, "utf8");
+  return ranked;
+}
+
 function main() {
   const cmsProjects = loadProjects();
   const legacyProjects = loadLegacyProjects();
-  const allProjects = [...legacyProjects, ...cmsProjects];
+  const order = readOrder();
+  const allProjects = applyOrder([...legacyProjects, ...cmsProjects], order.work);
   // `noindex` znaci "nevidljiva stranica": van sitemap-a, van /work liste,
   // dostupna samo direktnim linkom. Stranica se svejedno generise.
   const listedProjects = allProjects.filter((p) => !p.noindex);
@@ -419,6 +503,9 @@ function main() {
   }
 
   fs.writeFileSync(WORK_LIST_FILE, buildWorkListPage(listedProjects, partials), "utf8");
+
+  const homeRanked = writeHomeOrder(order);
+  if (homeRanked) console.log(`redosled na naslovnoj: ${homeRanked.join(", ")}`);
   console.log(
     `built  work/index.html (${listedProjects.length} kartica, ` +
       `${allProjects.length - listedProjects.length} nelistirano)`

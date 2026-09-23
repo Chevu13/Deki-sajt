@@ -79,6 +79,8 @@
     play: svg('<path d="M8 5.5v13l10-6.5-10-6.5Z"/>'),
     trash: svg('<path d="M4 7h16M9 7V5h6v2M6 7l1 13h10l1-13"/>'),
     logout: svg('<path d="M9 4H6a2 2 0 0 0-2 2v12a2 2 0 0 0 2 2h3M16 16l4-4-4-4M20 12H10"/>'),
+    arrowUp: svg('<path d="M12 19V5M12 5l-5 5M12 5l5 5"/>'),
+    arrowDown: svg('<path d="M12 5v14M12 19l-5-5M12 19l5-5"/>'),
     file: svg('<path d="M14 3H7a2 2 0 0 0-2 2v14a2 2 0 0 0 2 2h10a2 2 0 0 0 2-2V8l-5-5Z"/><path d="M14 3v5h5"/>'),
   };
 
@@ -295,7 +297,12 @@
       });
     });
 
-    return Promise.all([legacy, cms, pages]).then(function (groups) {
+    var order = this.readFile(CFG.orderFile).then(function (text) {
+      state.order = normalizeOrder(text ? JSON.parse(text) : null);
+      state.orderOriginal = JSON.parse(JSON.stringify(state.order));
+    });
+
+    return Promise.all([legacy, cms, pages, order]).then(function (groups) {
       return groups[0].concat(groups[1], groups[2]);
     });
   };
@@ -328,9 +335,12 @@
       getJson(CFG.legacyFile, []),
       getJson(CFG.legacyImagesFile, {}),
       getJson(CFG.pagesFile, {}),
+      getJson(CFG.orderFile, { work: [], home: [] }),
     ]).then(function (results) {
       state.legacyManifest = results[1];
       state.pagesManifest = results[2];
+      state.order = normalizeOrder(results[3]);
+      state.orderOriginal = JSON.parse(JSON.stringify(state.order));
       self.items = results[0]
         .map(function (row) {
           return fromLegacy(row, results[1][row.slug]);
@@ -556,6 +566,10 @@
     items: [],
     legacyManifest: {},
     pagesManifest: {},
+    // Redosled projekata na /work i na naslovnoj. Nije stavka kolekcije, pa ima
+    // svoj draft i svoj Publish.
+    order: { work: [], home: [] },
+    orderOriginal: { work: [], home: [] },
     collection: "work",
     view: "list",
     selectedKey: null,
@@ -674,6 +688,48 @@
 
   /* -------------------------------------------------------------- derive */
 
+  /* ------------------------------------------------------------ redosled */
+
+  // content/order.json je nagovestaj redosleda, ne spisak sta postoji: build
+  // sve nenabrojano redja na kraj. Zato se ovde ne validira sadrzaj, samo oblik.
+  function normalizeOrder(data) {
+    return {
+      work: Array.isArray(data && data.work) ? data.work.slice() : [],
+      home: Array.isArray(data && data.home) ? data.home.slice() : [],
+    };
+  }
+
+  // Projekti u redosledu koji panel zna, plus svaki koji je u medjuvremenu dodat
+  // a jos nije u order.json — inace bi novi projekat bio nevidljiv na ovom ekranu.
+  function orderedProjects() {
+    var projects = state.items.filter(function (item) {
+      return item.kind !== 'page';
+    });
+    var bySlug = {};
+    projects.forEach(function (item) {
+      if (item.slug) bySlug[item.slug] = item;
+    });
+
+    var rows = [];
+    state.order.work.forEach(function (slug) {
+      if (bySlug[slug]) rows.push(bySlug[slug]);
+    });
+    projects.forEach(function (item) {
+      if (rows.indexOf(item) < 0) rows.push(item);
+    });
+    return rows;
+  }
+
+  function orderDirty() {
+    return JSON.stringify(state.order) !== JSON.stringify(state.orderOriginal);
+  }
+
+  function moveSlug(list, from, to) {
+    if (to < 0 || to >= list.length || from === to) return false;
+    list.splice(to, 0, list.splice(from, 1)[0]);
+    return true;
+  }
+
   function itemsInCollection(name) {
     return state.items.filter(function (item) {
       return name === "pages" ? item.kind === "page" : item.kind !== "page";
@@ -761,17 +817,25 @@
   function renderTopbar() {
     var right = [];
 
-    if (state.view === "detail") {
+    if (state.view === "detail" || state.collection === "order") {
+      // Redosled nije stavka kolekcije, pa ima svoj draft i svoj Publish.
+      var isOrder = state.view !== "detail";
+      var dirty = isOrder ? orderDirty() : state.dirty;
+
       right.push(
         el("span", {
-          class: "savestate" + (state.dirty ? " is-dirty" : ""),
-          text: state.saving ? "Objavljujem…" : state.dirty ? "Nesacuvano" : "Saved",
+          class: "savestate" + (dirty ? " is-dirty" : ""),
+          text: state.saving ? "Objavljujem…" : dirty ? "Nesacuvano" : "Saved",
         })
       );
       right.push(
         el(
           "button",
-          { class: "btn btn--primary", disabled: !state.dirty || state.saving, onclick: publishDraft },
+          {
+            class: "btn btn--primary",
+            disabled: !dirty || state.saving,
+            onclick: isOrder ? publishOrder : publishDraft,
+          },
           ["Publish"]
         )
       );
@@ -840,9 +904,11 @@
       return el("aside", { class: "sidebar" }, [tabs, rail]);
     }
 
+    var isOrder = state.collection === "order";
+
     return el("aside", { class: "sidebar" }, [
       tabs,
-      el("div", { class: "sidebar__search" }, [
+      isOrder ? null : el("div", { class: "sidebar__search" }, [
         el("span", { html: ICONS.search }),
         el("input", {
           type: "search",
@@ -857,7 +923,8 @@
       el("div", { class: "sidebar__list" }, [
         collectionButton("work", "Work Items", ICONS.database),
         collectionButton("pages", "Pages", ICONS.file),
-        el("button", { class: "collection collection--add", onclick: createItem }, [
+        collectionButton("order", "Redosled", ICONS.sort),
+        isOrder ? null : el("button", { class: "collection collection--add", onclick: createItem }, [
           el("span", { html: ICONS.plus }),
           el("span", { text: "Add..." }),
         ]),
@@ -888,8 +955,151 @@
     );
   }
 
+  // Jedan red na ekranu Redosled. Prevlacenje radi preko HTML5 drag-and-drop-a,
+  // a strelice stoje uz njega jer je prevlacenje na trackpad-u lako promasiti.
+  function orderRow(list, index, label, badge, onChange) {
+    function commit(from, to) {
+      if (!moveSlug(list, from, to)) return;
+      onChange();
+    }
+
+    return el(
+      'li',
+      {
+        class: 'ord__row',
+        draggable: true,
+        ondragstart: function (event) {
+          event.dataTransfer.effectAllowed = 'move';
+          // Firefox ne pokrece prevlacenje bez podatka u dogadjaju.
+          event.dataTransfer.setData('text/plain', String(index));
+          event.target.classList.add('is-dragging');
+        },
+        ondragend: function (event) {
+          event.target.classList.remove('is-dragging');
+        },
+        ondragover: function (event) {
+          event.preventDefault();
+          event.dataTransfer.dropEffect = 'move';
+          event.currentTarget.classList.add('is-over');
+        },
+        ondragleave: function (event) {
+          event.currentTarget.classList.remove('is-over');
+        },
+        ondrop: function (event) {
+          event.preventDefault();
+          event.currentTarget.classList.remove('is-over');
+          var from = Number(event.dataTransfer.getData('text/plain'));
+          if (!isNaN(from)) commit(from, index);
+        },
+      },
+      [
+        el('span', { class: 'ord__grip', html: ICONS.grip }),
+        el('span', { class: 'ord__num', text: String(index + 1) }),
+        el('span', { class: 'ord__title', text: label }),
+        badge ? el('span', { class: 'rail__badge', text: badge }) : null,
+        el('span', { class: 'ord__moves' }, [
+          el(
+            'button',
+            {
+              class: 'icon-btn',
+              title: 'Pomeri gore',
+              disabled: index === 0,
+              onclick: function () {
+                commit(index, index - 1);
+              },
+            },
+            [el('span', { html: ICONS.arrowUp })]
+          ),
+          el(
+            'button',
+            {
+              class: 'icon-btn',
+              title: 'Pomeri dole',
+              disabled: index === list.length - 1,
+              onclick: function () {
+                commit(index, index + 1);
+              },
+            },
+            [el('span', { html: ICONS.arrowDown })]
+          ),
+        ]),
+      ]
+    );
+  }
+
+  function renderOrder() {
+    var projects = orderedProjects();
+    // state.order.work se drzi u koraku sa onim sto se vidi: novi projekat koji
+    // jos nije u fajlu ovde dobija svoje mesto, pa Publish upisuje potpun spisak.
+    state.order.work = projects.map(function (item) {
+      return item.slug;
+    });
+
+    var titleBySlug = {};
+    projects.forEach(function (item) {
+      titleBySlug[item.slug] = item.title || item.slug;
+    });
+
+    var workList = el(
+      'ol',
+      { class: 'ord__list' },
+      projects.map(function (item, index) {
+        return orderRow(
+          state.order.work,
+          index,
+          item.title || item.slug,
+          item.kind === 'legacy' ? 'Framer' : null,
+          function () {
+            render();
+          }
+        );
+      })
+    );
+
+    var homeList = state.order.home.length
+      ? el(
+          'ol',
+          { class: 'ord__list' },
+          state.order.home.map(function (slug, index) {
+            return orderRow(state.order.home, index, titleBySlug[slug] || slug, null, function () {
+              render();
+            });
+          })
+        )
+      : el('p', {
+          class: 'field__hint',
+          text:
+            'Kartice sa naslovne nisu jos procitane. Pokreni `npm run media-map` ' +
+            'pa osvezi panel.',
+        });
+
+    return el('div', { class: 'ord' }, [
+      el('section', { class: 'ord__panel' }, [
+        el('h2', { class: 'ord__heading', text: 'Work stranica' }),
+        el('p', {
+          class: 'ord__hint',
+          text:
+            'Redosled kartica na /work. Prevuci red ili koristi strelice. ' +
+            'Projekti na Draft-u se ne prikazuju na sajtu, ali ostaju ovde da im ' +
+            'mesto ne propadne dok se ne vrate na Live.',
+        }),
+        workList,
+      ]),
+      el('section', { class: 'ord__panel' }, [
+        el('h2', { class: 'ord__heading', text: 'Naslovna strana' }),
+        el('p', {
+          class: 'ord__hint',
+          text:
+            'Redosled cetiri kartice na dnu naslovne. Koje su to kartice dolazi iz ' +
+            'Framer export-a i ne menja se odavde — menja se samo njihov raspored.',
+        }),
+        homeList,
+      ]),
+    ]);
+  }
   function renderMain() {
     if (state.view === "detail") return el("main", { class: "main" }, [renderEditor()]);
+    if (state.collection === "order") return el("main", { class: "main" }, [renderOrder()]);
     return el("main", { class: "main" }, [renderToolbar(), renderTable()]);
   }
 
@@ -2171,6 +2381,32 @@
     }
   }
 
+  // Redosled ide u jedan fajl, pa je commit kratak. Stranice ne prepisuje panel
+  // nego build na Vercel-u: on cita content/order.json i po njemu redja kartice
+  // na /work i upisuje CSS `order` na naslovnu.
+  function publishOrder() {
+    if (!orderDirty()) return;
+
+    state.saving = true;
+    render();
+
+    var body = JSON.stringify({ work: state.order.work, home: state.order.home }, null, 2);
+    state.store
+      .commit('CMS: redosled projekata', [
+        { path: CFG.orderFile, base64: b64encode(body + '\n') },
+      ])
+      .then(function () {
+        state.orderOriginal = JSON.parse(JSON.stringify(state.order));
+        state.saving = false;
+        render();
+        toast('Redosled je sacuvan. Vidi se na sajtu kad Vercel zavrsi build.');
+      })
+      .catch(function (err) {
+        state.saving = false;
+        render();
+        toast(err.message || 'Redosled nije sacuvan.', true);
+      });
+  }
   function publishDraft() {
     var draft = state.draft;
     if (!draft.title.trim()) {

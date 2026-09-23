@@ -21,6 +21,8 @@ const ROOT = path.resolve(import.meta.dirname, "..");
 const LEGACY_FILE = path.join(ROOT, "content/legacy-work.json");
 const LEGACY_OUT = path.join(ROOT, "content/legacy-images.json");
 const PAGES_OUT = path.join(ROOT, "content/pages.json");
+const ORDER_OUT = path.join(ROOT, "content/order.json");
+const CONTENT_DIR = path.join(ROOT, "content/work");
 
 // Slike koje se javljaju na svakoj stranici i nisu deo sadrzaja.
 const CHROME_IMAGES = new Set([
@@ -409,6 +411,73 @@ function buildPages(legacyManifest) {
   fs.writeFileSync(PAGES_OUT, JSON.stringify(pages, null, 2) + "\n", "utf8");
 }
 
+// content/order.json drzi redosled projekata na /work i na naslovnoj. Panel ga
+// pise, build.mjs ga cita. Ovde se samo dopunjuje: novi projekti se dodaju na
+// kraj, nestali se izbacuju, a vec podeseni raspored se ne dira.
+//
+// Naslovne cetiri kartice dolaze iz Framer export-a i ne biraju se odavde —
+// citaju se iz same index.html, pa ih panel ima cim ovo jednom prodje.
+function knownSlugs() {
+  const legacy = JSON.parse(fs.readFileSync(LEGACY_FILE, "utf8")).map((row) => row.slug);
+  // Slug se cita iz frontmatter-a, ne iz imena fajla: kolega je preimenovao
+  // projekat u panelu, pa je ostalo hibbernate-wintersports.md sa slug-om
+  // hibernate-wintersports. /work se gradi po slug-u.
+  const cms = fs.existsSync(CONTENT_DIR)
+    ? fs
+        .readdirSync(CONTENT_DIR)
+        .filter((file) => file.endsWith(".md"))
+        .map((file) => {
+          const raw = fs.readFileSync(path.join(CONTENT_DIR, file), "utf8");
+          const match = raw.match(/^slug:\s*(.+)$/m);
+          const slug = match ? match[1].trim().replace(/^['"]|['"]$/g, "") : "";
+          return slug || file.replace(/[.]md$/, "");
+        })
+    : [];
+  return [...legacy, ...cms].filter(Boolean);
+}
+
+function homeSlugs() {
+  const html = readHtml("index.html");
+  if (!html) return [];
+  const seen = [];
+  const re = /href="[.]\/work\/([a-z0-9-]+)"/g;
+  let match;
+  while ((match = re.exec(html))) {
+    if (!seen.includes(match[1])) seen.push(match[1]);
+  }
+  return seen;
+}
+
+// Zadrzi zatecen raspored, dodaj novo na kraj, izbaci sta vise ne postoji.
+function mergeOrder(previous, available) {
+  const have = new Set(available);
+  const kept = previous.filter((slug) => have.has(slug));
+  const added = available.filter((slug) => !kept.includes(slug));
+  return [...kept, ...added];
+}
+
+function buildOrder() {
+  let previous = { work: [], home: [] };
+  if (fs.existsSync(ORDER_OUT)) {
+    try {
+      const data = JSON.parse(fs.readFileSync(ORDER_OUT, "utf8"));
+      previous = {
+        work: Array.isArray(data.work) ? data.work : [],
+        home: Array.isArray(data.home) ? data.home : [],
+      };
+    } catch (err) {
+      console.warn("upozorenje: content/order.json nije ispravan JSON — pravi se novi");
+    }
+  }
+
+  const order = {
+    work: mergeOrder(previous.work, knownSlugs()),
+    home: mergeOrder(previous.home, homeSlugs()),
+  };
+  fs.writeFileSync(ORDER_OUT, JSON.stringify(order, null, 2) + "\n", "utf8");
+  return order;
+}
+
 function main() {
   console.log("— project stranice —");
   const legacyManifest = buildLegacy();
@@ -425,12 +494,17 @@ function main() {
     `framer-media.js: ${media.length ? "dodat u " + media.join(", ") : "vec svuda"}`
   );
 
+  const order = buildOrder();
+  console.log(
+    `\n— redosled —\n/work: ${order.work.join(", ")}\nnaslovna: ${order.home.join(", ") || "(nema kartica)"}`
+  );
+
   const contact = ["contact/index.html"].filter(ensureContactScript);
   console.log(
     `contact-form.js: ${contact.length ? "dodat u " + contact.join(", ") : "vec svuda"}`
   );
 
-  console.log("\nnapisano: content/legacy-images.json, content/pages.json");
+  console.log("\nnapisano: content/legacy-images.json, content/pages.json, content/order.json");
 }
 
 main();

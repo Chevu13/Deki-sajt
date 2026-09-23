@@ -91,6 +91,7 @@ Mape "šta stoji gde" pravi `npm run media-map`:
 content/legacy-images.json   6 project stranica: tekstualna polja, Thumb,
                              Image 1–6 (+ dodatne), video
 content/pages.json           Home i About: slike + tekst
+content/order.json           Redosled projekata na /work i na naslovnoj
 ```
 
 Zamena mora da pogodi **svako mesto na kom sadržaj stoji**, inače React posle
@@ -446,9 +447,58 @@ Polje **Kadar** u panelu (`hero_focus` u frontmatteru: `top` / `center` /
 
 Framer je na naslovnu stavio cetiri izabrana rada. To je urednicki izbor, ne
 cela lista — cela lista je `/work`. Novi projekti se zato na naslovnoj ne
-pojavljuju sami; ako neki treba da udje medju izabrane, menja se sama
-`index.html`.
+pojavljuju sami; ako neki treba da **udje medju izabrane**, menja se sama
+`index.html`. Njihov **redosled** se menja iz panela — vidi ispod.
 
+## Redosled projekata
+
+Panel → **Redosled**. Dve liste: `/work` (svi projekti) i naslovna (one cetiri
+kartice). Prevlacenjem ili strelicama, pa **Publish**.
+
+Sve stoji u `content/order.json`:
+
+```json
+{ "work": ["slug", "slug", ...], "home": ["slug", ...] }
+```
+
+Fajl je **nagovestaj redosleda, ne spisak sta postoji**. Sve sto u njemu nije
+nabrojano `build.mjs` redja na kraj, zadrzavajuci medjusobni raspored. Zato novi
+projekat radi i pre nego sto ga neko pomeri u panelu, a preimenovan ili obrisan
+slug ne moze da izbaci projekat sa liste.
+
+`npm run media-map` fajl dopunjuje: novo na kraj, nestalo napolje, vec podesen
+raspored se ne dira. Slug se cita iz frontmatter-a, ne iz imena fajla — kolega je
+preimenovao projekat u panelu, pa je ostalo `hibbernate-wintersports.md` sa
+slug-om `hibernate-wintersports`.
+
+### Zasto naslovna radi bez diranja Framer markupa
+
+Njene cetiri kartice se ne generisu odavde i ne mogu da se prepisu: React posle
+hidracije prezida sekciju iz svojih propova. Ali kartice su **flex-stavke**, a
+flex ima `order` — pa se menja samo raspored, ne i markup. Framer i dalje racuna
+svoje scroll animacije nad istim cvorovima; za njega se nista nije promenilo.
+
+`build.mjs` upisuje pravilo u `<style id="cms-home-order">` u `<head>`:
+
+```css
+div:has(> a[href="./work/pletho"]){order:0 !important}
+```
+
+Kartica se cilja preko `href` linka u njoj, jer se Framer klase menjaju sa svakim
+exportom. Isti selektor pokriva i Desktop i Mobile varijantu — obe nose isti
+`href`. `!important` je tu jer Framer inline stilove prepisuje u svakom frame-u.
+
+Pravilo stoji u `<head>` staticki, ne ubacuje ga skript: raspored je tacan pre
+nego sto Framer ista izmeri, pa nema trenutka u kom bi se videlo pogresno stanje.
+
+Oslanja se na CSS `:has()`. Ako ga pregledac nema (pre Chrome 105 / Safari 15.4 /
+Firefox 121), pravilo se preskace i ostaje redosled iz export-a — stranica radi
+normalno, samo se raspored ne primenjuje.
+
+### Draft projekti
+
+Ostaju na listi u panelu iako se na sajtu ne vide. Tako im mesto ne propadne dok
+se ne vrate na Live.
 ### Animacije na CMS stranicama
 
 Sve je prepisano sa Framer stranica, izmereno u browseru:
