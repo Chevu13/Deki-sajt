@@ -9,7 +9,7 @@ services:
   - Editorial Design
 overview: Two photographers, one shared name, and a documentary eye for the unscripted moments that make a wedding day unforgettable.
 live_link: https://www.djokovicidjordje.com/
-hero_image: /assets/uploads/mt8qan6q-foto-pettine-ifjhaioaoqe-unsplash.jpg
+hero_image: /assets/uploads/muqy0y1v-yohann-libot-gfjndssyia4-unsplash.jpg
 hero_focus: bottom
 gallery:
   - type: image
